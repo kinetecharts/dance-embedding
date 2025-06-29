@@ -26,11 +26,11 @@ The system consists of three main components:
 - **Python 3.9** (required; other versions are not supported due to MediaPipe and UMAP dependencies)
 - [uv](https://docs.astral.sh/uv/) (recommended) or pip
 
-### Quick Start
+### Quick Installation
 
 1. **Clone the repository**:
    ```bash
-   git clone <repository-url>
+   git@github.com:kinetecharts/dance-embedding.git
    cd motion_embedding
    ```
 
@@ -69,6 +69,51 @@ The system consists of three main components:
    ```bash
    python install.py
    ```
+
+## 🚀 Quick Start
+
+Get up and running in minutes with these simple steps:
+
+1. **Create the data directory structure**:
+   ```bash
+   mkdir -p data/video data/poses data/analysis/dimension_reduction
+   ```
+
+2. **Add a dance video file**:
+   ```bash
+   # Copy your dance video to the data/video folder
+   cp /path/to/your/dance_video.mp4 data/video/
+   ```
+
+3. **Extract pose data from the video**:
+   ```bash
+   # auto list videos and extract pose
+   python -m dance_motion_embedding.pose_extraction
+   
+   # or specify video
+   python -m dance_motion_embedding.pose_extraction --video data/video/dance_video.mp4
+   ```
+   This will create a CSV file with pose landmarks in `data/poses/`.
+
+4. **Run dimension reduction and create visualizations**:
+   ```bash
+   # auto run
+   python -m dimension_reduction.main
+
+   # Basic visualization with default settings
+   python -m dimension_reduction.main --video data/video/dance_video.mp4 --pose-csv data/poses/dance_video.csv
+   
+   # Or create combined visualization with video player
+   python -m dimension_reduction.main --video data/video/dance_video.mp4 --combined
+   ```
+   This generates interactive plots and saves them to `data/analysis/dimension_reduction/`.
+
+5. **Start the web application server**:
+   ```bash
+   cd src/dimension_reduction/webapp
+   python server.py
+   ```
+   Open your browser to [http://127.0.0.1:50680/](http://127.0.0.1:50680/) to view interactive visualizations with synchronized video playback.
 
 ### Development Setup
 
