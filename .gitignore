@@ -175,6 +175,14 @@ data/analysis/
 *.h5
 *.hdf5
 
+# Images (allow screenshots and documentation images)
+!images/
+!images/*.png
+!images/*.jpg
+!images/*.jpeg
+!images/*.gif
+!images/*.svg
+
 # Rerun
 .rr/
 

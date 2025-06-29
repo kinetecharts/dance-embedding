@@ -89,7 +89,7 @@ Get up and running in minutes with these simple steps:
    ```bash
    # auto list videos and extract pose
    python -m dance_motion_embedding.pose_extraction
-   
+
    # or specify video
    python -m dance_motion_embedding.pose_extraction --video data/video/dance_video.mp4
    ```
@@ -114,6 +114,8 @@ Get up and running in minutes with these simple steps:
    python server.py
    ```
    Open your browser to [http://127.0.0.1:50680/](http://127.0.0.1:50680/) to view interactive visualizations with synchronized video playback.
+
+   ![Dance Motion Web Interface](images/web_interface.png "Interactive web interface showing synchronized video and pose visualization")
 
 ### Development Setup
 
