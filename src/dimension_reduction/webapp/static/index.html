@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Dance Motion Playback</title>
+    <link rel="stylesheet" href="static/style.css">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+<div class="container">
+    <h1>Dance Motion Playback</h1>
+    <div class="controls">
+        <label>Video:
+            <select id="videoSelect"></select>
+        </label>
+        <label>Reduction Method:
+            <select id="methodSelect"></select>
+        </label>
+        <label>Pose Data:
+            <select id="poseSelect"></select>
+        </label>
+        <label>Reduced Data:
+            <select id="reducedSelect"></select>
+        </label>
+        <button id="loadBtn">Load</button>
+    </div>
+    <div class="main-content">
+        <div class="video-panel">
+            <video id="videoPlayer" controls width="480"></video>
+            <div id="timeline"></div>
+        </div>
+        <div class="plot-panel">
+            <div id="plot"></div>
+        </div>
+    </div>
+</div>
+<script src="static/app.js"></script>
+</body>
+</html> 
