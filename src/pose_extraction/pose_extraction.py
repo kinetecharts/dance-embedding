@@ -257,7 +257,8 @@ class PoseExtractor:
             height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
             cap.release()
             
-            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            # Use H.264 for browser compatibility
+            fourcc = cv2.VideoWriter_fourcc(*'avc1')  # H.264 for HTML5 video
             video_writer = cv2.VideoWriter(overlay_video_path, fourcc, fps, (width, height))
         
         with closing(VideoSource(video_path)) as video_source:
