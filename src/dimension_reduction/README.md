@@ -9,20 +9,24 @@ This module provides interactive visualization of dance pose data in reduced-dim
 - **Video Synchronization**: Playback video while showing corresponding data point movement
 - **Interactive Controls**: Select videos, methods, and dimensions
 - **Real-time Trajectory**: See how dance movements create paths in reduced space
+- **CSV Output**: Simplified data format for easy analysis
 
 ## Quick Start
 
 ### Command Line Usage
 
 ```bash
-# Basic usage with default settings
-python -m dimension_reduction.main
-
-# Specify video and pose CSV
+# Basic usage - generates CSV only (fastest)
 python -m dimension_reduction.main --video data/video/dance.mp4 --pose-csv data/poses/dance.csv
 
-# Choose specific reduction method and dimensions
-python -m dimension_reduction.main --method umap --dimensions 3d --video data/video/dance.mp4
+# Interactive mode
+python -m dimension_reduction.main
+
+# Specify video and pose CSV with HTML output
+python -m dimension_reduction.main --video data/video/dance.mp4 --pose-csv data/poses/dance.csv --save-html
+
+# Choose specific reduction method and dimensions with static plot
+python -m dimension_reduction.main --method umap --dimensions 3d --video data/video/dance.mp4 --save-png
 
 # Create combined visualization with video player
 python -m dimension_reduction.main --video data/video/dance.mp4 --combined
@@ -208,17 +212,25 @@ python -m dimension_reduction.main \
 
 ## Output Files
 
-The module generates several output files:
+The module generates several types of output files in `data/dimension_reduction/`:
 
-- **`data/analysis/dimension_reduction/`**: Main output directory
-  - `{video_name}_{method}_{dimensions}.html`: Interactive visualization with timeline
-  - `{video_name}_combined_visualization.html`: Combined plot and video player
-  - `{video_name}_video_player.html`: Standalone video player with timeline
-  - `{video_name}_{method}_{dimensions}.png`: Static plot image
-  - `{video_name}_reduced_data.json`: Reduced coordinates data
+1. **Reduced Data CSV**: `{video_name}_{method}_reduced.csv` *(always generated)*
+   - Contains timestamp, frame_number, and reduced coordinates (x, y, z)
+   - Simplified format for easy analysis and further processing
 
-- **`data/analysis/video_frames/`**: Extracted video frames (if `--extract-frames` used)
-  - `frame_000000.jpg`, `frame_000001.jpg`, etc.: Individual video frames
+2. **Interactive HTML**: `{video_name}_{method}_interactive_{dimensions}.html` *(with --save-html)*
+   - Interactive Plotly visualization with timeline controls
+
+3. **Static Plot**: `{video_name}_{method}_static_2d.png` *(with --save-png)*
+   - Static 2D plot for documentation
+
+4. **Video Player**: `{video_name}_video_player.html` *(with --create-video-player)*
+   - Standalone video player with timeline synchronization
+
+5. **Combined Visualization**: `{video_name}_combined_visualization.html` *(with --combined)*
+   - Combined plot and video player in one interface
+
+**Note**: By default, only the CSV file is generated for maximum speed. Use the webapp viewer for interactive analysis.
 
 ## Troubleshooting
 

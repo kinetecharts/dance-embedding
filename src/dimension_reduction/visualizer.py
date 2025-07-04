@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 class DimensionReductionVisualizer:
     """Interactive visualizer for dimension reduction with video synchronization."""
     
-    def __init__(self, output_dir: str = "data/analysis/dimension_reduction"):
+    def __init__(self, output_dir: str = "data/dimension_reduction"):
         """Initialize the visualizer.
         
         Args:
@@ -417,33 +417,39 @@ class DimensionReductionVisualizer:
         
         return fig
     
-    def save_reduced_data(self, save_json: bool = True) -> None:
-        """Save reduced data to file.
+    def save_reduced_data(self, save_csv: bool = True) -> None:
+        """Save reduced data to CSV file.
         
         Args:
-            save_json: Whether to save as JSON file
+            save_csv: Whether to save as CSV file
         """
         if self.reduced_data is None:
             raise ValueError("No reduced data available. Call create_visualization() first.")
         
-        if save_json:
+        if save_csv:
             video_name = Path(self.video_path).stem
             method = getattr(self, 'method', 'reduction')
-            json_path = self.output_dir / f"{video_name}_{method}_reduced_data.json"
+            csv_path = self.output_dir / f"{video_name}_{method}_reduced.csv"
             
-            data_dict = {
-                'reduced_data': self.reduced_data.tolist(),
-                'timestamps': self.timestamps.tolist(),
-                'frame_numbers': self.frame_numbers.tolist(),
-                'video_path': self.video_path,
-                'video_fps': self.video_fps,
-                'video_duration': self.video_duration
-            }
+            # Create DataFrame with reduced data and timestamps
+            if self.reduced_data.shape[1] == 2:
+                df = pd.DataFrame({
+                    'timestamp': self.timestamps,
+                    'frame_number': self.frame_numbers,
+                    'x': self.reduced_data[:, 0],
+                    'y': self.reduced_data[:, 1]
+                })
+            else:  # 3D
+                df = pd.DataFrame({
+                    'timestamp': self.timestamps,
+                    'frame_number': self.frame_numbers,
+                    'x': self.reduced_data[:, 0],
+                    'y': self.reduced_data[:, 1],
+                    'z': self.reduced_data[:, 2]
+                })
             
-            with open(json_path, 'w') as f:
-                json.dump(data_dict, f, indent=2)
-            
-            logger.info(f"Reduced data saved to {json_path}")
+            df.to_csv(csv_path, index=False)
+            logger.info(f"Reduced data saved to {csv_path}")
     
     def show(self) -> None:
         """Display the interactive visualization."""

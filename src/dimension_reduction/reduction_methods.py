@@ -32,9 +32,9 @@ class ReductionMethods:
             confidence_threshold: Minimum confidence score for keypoints
             
         Returns:
-            Preprocessed pose data as numpy array
+            Preprocessed pose data as numpy array (joint coordinates only)
         """
-        # Extract coordinate columns
+        # Extract coordinate columns only (exclude timestamps, frame numbers, and confidence)
         coord_columns = []
         for col in pose_data.columns:
             if col.endswith('_x') or col.endswith('_y'):
@@ -42,10 +42,10 @@ class ReductionMethods:
             elif use_3d and col.endswith('_z'):
                 coord_columns.append(col)
         
-        # Extract confidence columns
+        # Extract confidence columns for filtering
         confidence_columns = [col for col in pose_data.columns if col.endswith('_confidence')]
         
-        # Create feature matrix
+        # Create feature matrix with joint coordinates only
         features = pose_data[coord_columns].values
         
         # Apply confidence filtering if available

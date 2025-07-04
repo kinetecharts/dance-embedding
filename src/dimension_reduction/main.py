@@ -192,7 +192,7 @@ def get_unanalyzed_pose_files(pose_dir, reduced_dir, methods):
         base = pose_file.stem
         missing_methods = []
         for method in methods:
-            reduced_file = reduced_dir / f"{base}_{method}_reduced_data.json"
+            reduced_file = reduced_dir / f"{base}_{method}_reduced.csv"
             if not reduced_file.exists():
                 missing_methods.append(method)
         if missing_methods:
@@ -207,14 +207,17 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
+  # Basic usage - generates CSV only (fastest)
+  python -m dimension_reduction.main --video data/video/dance.mp4 --pose-csv data/poses/dance.csv
+  
   # Interactive mode
   python -m dimension_reduction.main
   
-  # Command line mode
-  python -m dimension_reduction.main --video data/video/dance.mp4 --pose-csv data/poses/dance.csv --method umap --dimensions 3d
+  # Command line mode with HTML output
+  python -m dimension_reduction.main --video data/video/dance.mp4 --pose-csv data/poses/dance.csv --method umap --dimensions 3d --save-html
   
-  # Quick PCA analysis
-  python -m dimension_reduction.main --video data/video/dance.mp4 --method pca --dimensions 2d
+  # Quick PCA analysis with static plot
+  python -m dimension_reduction.main --video data/video/dance.mp4 --method pca --dimensions 2d --save-png
         """
     )
     
@@ -229,7 +232,7 @@ Examples:
     parser.add_argument("--confidence-threshold", type=float, default=0.5,
                        help="Minimum confidence threshold for keypoints")
     parser.add_argument("--output-dir", type=str, 
-                       default="data/analysis/dimension_reduction",
+                       default="data/dimension_reduction",
                        help="Output directory for results")
     parser.add_argument("--no-interactive", action="store_true",
                        help="Disable interactive plot display")
@@ -241,6 +244,10 @@ Examples:
                        help="Extract video frames for synchronization")
     parser.add_argument("--combined", action="store_true",
                        help="Create combined visualization with plot and video player side by side")
+    parser.add_argument("--save-html", action="store_true",
+                       help="Save interactive HTML plot")
+    parser.add_argument("--save-png", action="store_true",
+                       help="Save static PNG plot")
     
     args = parser.parse_args()
     
@@ -248,7 +255,7 @@ Examples:
         # Batch mode: process all pose files that haven't been analyzed for all methods
         methods = ['umap', 'tsne', 'pca']
         pose_dir = Path("data/poses")
-        reduced_dir = Path("data/analysis/dimension_reduction")
+        reduced_dir = Path("data/dimension_reduction")
         unanalyzed = get_unanalyzed_pose_files(pose_dir, reduced_dir, methods)
         if not unanalyzed:
             print("All pose files have been analyzed for all methods.")
@@ -265,12 +272,10 @@ Examples:
                     if candidate.exists():
                         video_guess = candidate
                         break
-                visualizer = DimensionReductionVisualizer(output_dir="data/analysis/dimension_reduction")
+                visualizer = DimensionReductionVisualizer(output_dir="data/dimension_reduction")
                 visualizer.load_data(str(video_guess) if video_guess else "", str(pose_file))
                 visualizer.create_visualization(method=method, dimensions="2d")
-                visualizer.create_interactive_plot(save_html=True)
-                visualizer.create_static_plot(save_png=True)
-                visualizer.save_reduced_data(save_json=True)
+                visualizer.save_reduced_data(save_csv=True)
         print("Batch dimension reduction complete.")
         return
     
@@ -292,18 +297,20 @@ Examples:
             confidence_threshold=args.confidence_threshold
         )
         
-        # Create plots
+        # Save CSV data (default behavior)
         if not args.no_save:
+            logger.info("Saving reduced data...")
+            visualizer.save_reduced_data(save_csv=True)
+        
+        # Create plots only if explicitly requested
+        if args.save_html:
             logger.info("Creating interactive plot...")
-            fig = visualizer.create_interactive_plot(save_html=True)
-            
+            visualizer.create_interactive_plot(save_html=True)
+        
+        if args.save_png:
             logger.info("Creating static plot...")
             visualizer.create_static_plot(save_png=True)
-            
-            logger.info("Saving reduced data...")
-            visualizer.save_reduced_data(save_json=True)
         
-        # Create video player if requested
         if args.create_video_player:
             logger.info("Creating video player with timeline synchronization...")
             visualizer.create_video_player_html(save_html=True)
@@ -318,8 +325,8 @@ Examples:
             logger.info("Creating combined visualization...")
             visualizer.create_combined_visualization(save_html=True)
         
-        # Show interactive plot
-        if not args.no_interactive:
+        # Show interactive plot only if explicitly requested
+        if not args.no_interactive and (args.create_video_player or args.combined or args.save_html):
             logger.info("Displaying interactive visualization...")
             visualizer.show()
         
@@ -336,9 +343,13 @@ Examples:
         
         if not args.no_save:
             print(f"\nFiles created:")
-            print(f"  - {video_name}_interactive_{args.dimensions}.html")
-            print(f"  - {video_name}_static_2d.png")
-            print(f"  - {video_name}_reduced_data.json")
+            print(f"  - {video_name}_{args.method}_reduced.csv")
+        
+        if args.save_html:
+            print(f"  - {video_name}_{args.method}_interactive_{args.dimensions}.html")
+        
+        if args.save_png:
+            print(f"  - {video_name}_{args.method}_static_2d.png")
         
         if args.create_video_player:
             print(f"  - {video_name}_video_player.html")

@@ -97,20 +97,17 @@ Get up and running in minutes with these simple steps:
 
 4. **Run dimension reduction and create visualizations**:
    ```bash
-   # auto run
-   python -m dimension_reduction.main
- 
-   # Basic visualization with default settings
+   # Generate CSV data only (fastest)
    python -m dimension_reduction.main --video data/video/dance_video.mp4 --pose-csv data/poses/dance_video.csv
    
-   # Or create combined visualization with video player
-   python -m dimension_reduction.main --video data/video/dance_video.mp4 --combined
+   # Or create interactive HTML visualization
+   python -m dimension_reduction.main --video data/video/dance_video.mp4 --pose-csv data/poses/dance_video.csv --save-html
    ```
-   This generates interactive plots and saves them to `data/analysis/dimension_reduction/`.
+   This generates CSV files in `data/dimension_reduction/` for analysis.
 
 5. **Start the web application server**:
    ```bash
-   cd src/dimension_reduction/webapp
+   cd src/viewer/webapp
    python server.py
    ```
    Open your browser to [http://127.0.0.1:50680/](http://127.0.0.1:50680/) to view interactive visualizations with synchronized video playback.
@@ -178,12 +175,15 @@ motion_embedding/
 │   └── main.py                  # Pose extraction pipeline
 ├── src/dimension_reduction/
 │   ├── main.py                  # Dimension reduction and visualization
-│   └── webapp/                  # Web application
+│   ├── visualizer.py            # Visualization tools
+│   └── reduction_methods.py     # Dimension reduction algorithms
+├── src/viewer/
+│   └── webapp/                  # Web application for viewing results
 ├── data/
 │   ├── video/                   # Input video files
 │   ├── poses/                   # Extracted pose CSV files
 │   ├── video_with_pose/         # Videos with pose overlays for review
-│   └── analysis/                # Analysis results and visualizations
+│   └── dimension_reduction/     # Dimension reduction results
 ├── examples/
 │   └── basic_usage.py           # Usage examples
 ├── tests/

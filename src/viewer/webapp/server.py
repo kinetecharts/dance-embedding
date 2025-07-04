@@ -4,7 +4,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 VIDEO_DIR = PROJECT_ROOT / "data/video"
 POSE_DIR = PROJECT_ROOT / "data/poses"
-REDUCED_DIR = PROJECT_ROOT / "data/analysis/dimension_reduction"
+REDUCED_DIR = PROJECT_ROOT / "data/dimension_reduction"
 
 from flask import Flask, send_from_directory, jsonify, request, render_template, Response
 import pandas as pd
@@ -65,9 +65,9 @@ def serve_reduced(filename):
     reduced_path = REDUCED_DIR / filename
     if not reduced_path.exists():
         return jsonify({"error": "Reduced data not found"}), 404
-    with open(reduced_path, 'r') as f:
-        data = json.load(f)
-    return jsonify(data)
+    # Read CSV file and convert to JSON format
+    df = pd.read_csv(reduced_path)
+    return df.to_json(orient="records")
 
 @app.route("/list_videos")
 def list_videos():
@@ -81,23 +81,27 @@ def list_poses():
 
 @app.route("/list_reduced")
 def list_reduced():
-    files = [f.name for f in REDUCED_DIR.glob("*.json") if f.is_file()]
+    files = [f.name for f in REDUCED_DIR.glob("*.csv") if f.is_file()]
     return jsonify(files)
 
 @app.route("/list_reductions_for_video/<video_basename>")
 def list_reductions_for_video(video_basename):
     # Find all reduced files for this video and extract method names
-    files = [f.name for f in REDUCED_DIR.glob(f"{video_basename}_*_reduced_data.json") if f.is_file()]
+    files = [f.name for f in REDUCED_DIR.glob(f"{video_basename}_*_reduced.csv") if f.is_file()]
     methods = []
     for fname in files:
         parts = fname.split('_')
         if len(parts) >= 3:
-            methods.append(parts[1])  # e.g., kurt_umap_reduced_data.json -> 'umap'
+            methods.append(parts[1])  # e.g., kurt_umap_reduced.csv -> 'umap'
     return jsonify(sorted(set(methods)))
 
 @app.route('/static/<path:filename>')
 def serve_static(filename):
     return send_from_directory(app.static_folder, filename)
 
+def start_server(port=50680, debug=True):
+    """Start the viewer server."""
+    app.run(debug=debug, port=port)
+
 if __name__ == "__main__":
-    app.run(debug=True, port=50680) 
+    start_server() 
