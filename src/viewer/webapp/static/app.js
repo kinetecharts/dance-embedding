@@ -1,3 +1,5 @@
+import { DIMENSION_PLOT_PANEL_SIZE } from './config.js';
+
 let poseData = [];
 let reducedData = [];
 let timestamps = [];
@@ -74,6 +76,7 @@ loadBtn.onclick = async function() {
     videoPlayer.src = `/video/${videoFile}`;
     videoPlayer.load();
     poseData = await fetch(`/pose/${poseFile}`).then(r => r.json());
+    window.poseData = poseData;
     reducedData = await fetch(`/reduced/${reducedFile}`).then(r => r.json());
     
     // Extract data from CSV format
@@ -84,6 +87,8 @@ loadBtn.onclick = async function() {
     renderPlot();
     setupTimeline();
     setupSync();
+    // Notify 3D viewer that poseData is loaded
+    document.dispatchEvent(new Event('poseDataLoaded'));
 };
 
 function renderPlot() {
@@ -115,6 +120,8 @@ function renderPlot() {
     plotTraceIdx = 1;
     Plotly.newPlot(plotDiv, [trace, highlight], {
         title: 'Dimension Reduction Trajectory',
+        width: DIMENSION_PLOT_PANEL_SIZE,
+        height: DIMENSION_PLOT_PANEL_SIZE,
         xaxis: { title: 'Component 1' },
         yaxis: { title: 'Component 2' },
         showlegend: false
@@ -126,7 +133,7 @@ function setupTimeline() {
     // Simple color bar timeline
     timelineDiv.innerHTML = '';
     const canvas = document.createElement('canvas');
-    canvas.width = timelineDiv.offsetWidth || 480;
+    canvas.width = timelineDiv.offsetWidth || PANEL_SIZE;
     canvas.height = 30;
     timelineDiv.appendChild(canvas);
     const ctx = canvas.getContext('2d');
@@ -164,6 +171,8 @@ function setupSync() {
             x: [[coords[idx][0]]],
             y: [[coords[idx][1]]]
         }, [plotTraceIdx]);
+        // Notify 3D viewer to update pose
+        document.dispatchEvent(new CustomEvent('update3DPose', { detail: { frameIdx: idx } }));
     };
 
     // Click on plot to seek video
@@ -176,5 +185,7 @@ function setupSync() {
         }
     });
 } 
+
+// (3D viewer code removed; now handled in pose3d.js)
 
 window.onload = populateDropdowns;

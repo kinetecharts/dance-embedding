@@ -33,11 +33,10 @@ h1 {
     align-items: center;
 }
 .plot-panel {
-    flex: 1.5;
+    flex: none;
 }
-#plot {
-    width: 100%;
-    min-height: 500px;
+.pose3d-panel {
+    flex: none;
 }
 #timeline {
     width: 100%;
