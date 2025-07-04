@@ -226,9 +226,9 @@ Examples:
     parser.add_argument("--method", type=str, choices=['pca', 'tsne', 'umap'], 
                        default='umap', help="Dimension reduction method")
     parser.add_argument("--dimensions", type=str, choices=['2d', '3d'], 
-                       default='2d', help="Output dimensions")
-    parser.add_argument("--use-3d-coords", action="store_true", 
-                       help="Use 3D coordinates from pose data (if available)")
+                       default='3d', help="Output dimensions")
+    parser.add_argument("--use-3d-coords", action="store_false", dest="no_3d_coords")
+    parser.set_defaults(no_3d_coords=False)
     parser.add_argument("--confidence-threshold", type=float, default=0.5,
                        help="Minimum confidence threshold for keypoints")
     parser.add_argument("--output-dir", type=str, 
@@ -293,7 +293,7 @@ Examples:
         visualizer.create_visualization(
             method=args.method,
             dimensions=args.dimensions,
-            use_3d_coords=args.use_3d_coords,
+            use_3d_coords=(not args.no_3d_coords),
             confidence_threshold=args.confidence_threshold
         )
         
