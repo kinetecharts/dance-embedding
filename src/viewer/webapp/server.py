@@ -2,7 +2,8 @@ import os
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
-VIDEO_DIR = PROJECT_ROOT / "data/video"
+VIDEO_DIR = PROJECT_ROOT / "data/video"  # List originals for dropdown
+VIDEO_WITH_POSE_DIR = PROJECT_ROOT / "data/video_with_pose"  # For overlay playback
 POSE_DIR = PROJECT_ROOT / "data/poses"
 REDUCED_DIR = PROJECT_ROOT / "data/dimension_reduction"
 
@@ -19,13 +20,26 @@ def index():
 
 @app.route("/video/<filename>")
 def serve_video(filename):
-    # Support range requests for seeking
-    video_path = VIDEO_DIR / filename
+    # Try to serve overlay video first (robust for any extension)
+    from pathlib import Path
+    stem = Path(filename).stem
+    # Search for any overlay video with the same stem
+    overlay_candidates = list(VIDEO_WITH_POSE_DIR.glob(f"{stem}_with_pose.*"))
+    print("Overlay candidates:", overlay_candidates)
+    overlay_path = None
+    if overlay_candidates:
+        # Prefer .mp4 if available
+        mp4s = [f for f in overlay_candidates if f.suffix.lower() == '.mp4']
+        overlay_path = mp4s[0] if mp4s else overlay_candidates[0]
+    if overlay_path and overlay_path.exists():
+        video_path = overlay_path
+    else:
+        video_path = VIDEO_DIR / filename
     if not video_path.exists():
         return "Video not found", 404
     range_header = request.headers.get('Range', None)
     if not range_header:
-        return send_from_directory(VIDEO_DIR, filename)
+        return send_from_directory(video_path.parent, video_path.name)
     # Handle range requests for video seeking
     size = video_path.stat().st_size
     byte1, byte2 = 0, None
@@ -71,7 +85,11 @@ def serve_reduced(filename):
 
 @app.route("/list_videos")
 def list_videos():
-    files = [f.name for f in VIDEO_DIR.glob("*") if f.is_file()]
+    # List only original videos for dropdown
+    video_extensions = {'.mp4', '.avi', '.mov', '.webm', '.mkv'}
+    files = [f.name for f in VIDEO_DIR.glob("*") 
+             if f.is_file() and f.suffix.lower() in video_extensions 
+             and not f.name.startswith('.')]
     return jsonify(files)
 
 @app.route("/list_poses")

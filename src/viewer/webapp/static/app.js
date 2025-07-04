@@ -34,7 +34,11 @@ async function populateDropdowns() {
 
 videoSelect.onchange = async function() {
     const videoFile = videoSelect.value;
-    const base = videoFile.replace(/\.[^/.]+$/, "");
+    // Remove _with_pose suffix if present
+    let base = videoFile.replace(/\.[^/.]+$/, "");
+    if (base.endsWith('_with_pose')) {
+        base = base.slice(0, -10); // Remove '_with_pose'
+    }
     // Populate reduction methods for this video
     const methods = await fetchFileList(`/list_reductions_for_video/${base}`);
     methodSelect.innerHTML = methods.length ? methods.map(m => `<option value="${m}">${m.toUpperCase()}</option>`).join('') : '<option value="">(not found)</option>';
@@ -43,7 +47,11 @@ videoSelect.onchange = async function() {
 
 methodSelect.onchange = function() {
     const videoFile = videoSelect.value;
-    const base = videoFile.replace(/\.[^/.]+$/, "");
+    // Remove _with_pose suffix if present
+    let base = videoFile.replace(/\.[^/.]+$/, "");
+    if (base.endsWith('_with_pose')) {
+        base = base.slice(0, -10); // Remove '_with_pose'
+    }
     const method = methodSelect.value;
     // Find reduced file for this video and method
     const reducedMatch = reducedFiles.find(f => f.startsWith(`${base}_${method}_`));
@@ -67,16 +75,20 @@ loadBtn.onclick = async function() {
     videoPlayer.load();
     poseData = await fetch(`/pose/${poseFile}`).then(r => r.json());
     reducedData = await fetch(`/reduced/${reducedFile}`).then(r => r.json());
-    timestamps = reducedData.timestamps;
-    frameNumbers = reducedData.frame_numbers;
-    videoDuration = reducedData.video_duration;
+    
+    // Extract data from CSV format
+    timestamps = reducedData.map(d => d.timestamp);
+    frameNumbers = reducedData.map(d => d.frame_number);
+    videoDuration = timestamps[timestamps.length - 1] || 0;
+    
     renderPlot();
     setupTimeline();
     setupSync();
 };
 
 function renderPlot() {
-    const coords = reducedData.reduced_data;
+    // Extract x, y coordinates from CSV data
+    const coords = reducedData.map(d => [d.x, d.y]);
     const color = timestamps;
     const trace = {
         x: coords.map(d => d[0]),
@@ -147,7 +159,7 @@ function setupSync() {
             }
         }
         // Update highlight
-        const coords = reducedData.reduced_data;
+        const coords = reducedData.map(d => [d.x, d.y]);
         Plotly.restyle(plotDiv, {
             x: [[coords[idx][0]]],
             y: [[coords[idx][1]]]
