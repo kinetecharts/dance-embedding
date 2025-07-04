@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Installation script for the dance motion embedding system."""
+"""Installation script for the pose extraction system."""
 
 import subprocess
 import sys
@@ -94,7 +94,7 @@ def run_tests():
 
 def main():
     """Main installation function."""
-    print("Dance Motion Embedding System - Installation")
+    print("Pose Extraction System - Installation")
     print("=" * 50)
     
     # Check Python version
@@ -119,7 +119,7 @@ def main():
         print("Installation completed successfully!")
         print("\nNext steps:")
         print("1. Place your dance videos in data/video/")
-        print("2. Run: python -m dance_motion_embedding.main --input-dir data/video")
+        print("2. Run: python -m pose_extraction.main --input-dir data/video")
         print("3. Check the examples/ directory for usage examples")
         print("4. Read the documentation in documents/")
     else:

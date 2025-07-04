@@ -1,6 +1,6 @@
-# Dance Motion Embedding - Module Usage Guide
+# Pose Extraction - Module Usage Guide
 
-This README provides step-by-step instructions for running the dance motion embedding pipeline from the `src/dance_motion_embedding` package directory. You can use the modules directly or via the command-line interface.
+This README provides step-by-step instructions for running the pose extraction pipeline from the `src/pose_extraction` package directory. This module focuses solely on extracting pose landmarks from videos using MediaPipe.
 
 ## Prerequisites
 
@@ -19,30 +19,30 @@ The `pose_extraction.py` module extracts 2D and 3D pose landmarks from videos us
 
 Extract poses from a single video:
 ```bash
-python -m dance_motion_embedding.pose_extraction --video data/video/your_video.mp4
+python -m pose_extraction.pose_extraction --video data/video/your_video.mp4
 ```
 
 Extract poses from all videos in a directory:
 ```bash
-python -m dance_motion_embedding.pose_extraction --input-dir data/video
+python -m pose_extraction.pose_extraction --input-dir data/video
 ```
 
 With Rerun visualization (real-time 3D pose tracking):
 ```bash
-python -m dance_motion_embedding.pose_extraction --video data/video/your_video.mp4 --use-rerun
+python -m pose_extraction.pose_extraction --video data/video/your_video.mp4 --use-rerun
 ```
 
 ### Python API Usage
 
 ```python
-from dance_motion_embedding import PoseExtractor
+from pose_extraction import PoseExtractor
 
 # Initialize extractor
 extractor = PoseExtractor(use_rerun=False)  # Set to True for visualization
 
 # Extract poses from a single video
 pose_data = extractor.extract_pose_from_video("data/video/your_video.mp4")
-print(f"Extracted {len(pose_data)} frames")
+print(f"Extracted pose data from {len(pose_data)} frames")
 
 # Process all videos in a directory
 extractor.process_video_directory("data/video", "data/poses")
@@ -82,73 +82,49 @@ The system extracts 33 pose keypoints including:
 You can extract pose data from a single video file using the `PoseExtractor` class:
 
 ```python
-from dance_motion_embedding import PoseExtractor
+from pose_extraction import PoseExtractor
 
 extractor = PoseExtractor(use_rerun=True)  # Set to False to disable Rerun visualization
 pose_data = extractor.extract_pose_from_video("data/video/your_video.mp4")
 print(f"Extracted {len(pose_data)} frames. CSV saved in data/poses/")
 ```
 
-## 2. Generate Embeddings from Pose Data
+## 2. Run the Full Pipeline (Recommended)
 
-Generate vector embeddings for poses or segments from a CSV file:
-
-```python
-from dance_motion_embedding import EmbeddingGenerator
-
-generator = EmbeddingGenerator(model_type="transformer", device="cpu")
-embeddings = generator.process_csv_file("data/poses/your_video.csv", embedding_type="segment")
-print(f"Embeddings shape: {embeddings.shape}. Saved in data/embeddings/")
-```
-
-## 3. Analyze Motion Embeddings
-
-Analyze and visualize the generated embeddings:
+You can run the complete pose extraction pipeline using the main pipeline class:
 
 ```python
-from dance_motion_embedding import MotionAnalyzer
+from pose_extraction.main import PoseExtractionPipeline
 
-analyzer = MotionAnalyzer(method="umap")
-embeddings = analyzer.load_embeddings("data/embeddings/your_video_segment.npy")
-results = analyzer.analyze_motion_patterns(embeddings)
-print("Analysis complete. Visualizations saved in data/analysis/")
-```
-
-## 4. Run the Full Pipeline (Recommended)
-
-You can run the entire pipeline (extraction → embedding → analysis) using the main pipeline class:
-
-```python
-from dance_motion_embedding.main import DanceMotionEmbeddingPipeline
-
-pipeline = DanceMotionEmbeddingPipeline(use_rerun=False, model_type="transformer", device="cpu")
-results = pipeline.run_full_pipeline("data/video/your_video.mp4", embedding_type="segment")
+pipeline = PoseExtractionPipeline(use_rerun=False)
+results = pipeline.run_full_pipeline("data/video/your_video.mp4")
 print("Pipeline complete!")
 print(f"Pose CSV: {results['pose_csv_path']}")
-print(f"Embeddings: {results['embeddings_path']}")
-print(f"Analysis: {results['analysis_dir']}")
 ```
 
-## 5. Batch Processing: All Videos in a Directory
+## 3. Batch Processing: All Videos in a Directory
 
 To process all videos in `data/video/`:
 
 ```python
-pipeline = DanceMotionEmbeddingPipeline()
-pipeline.process_video_directory(input_dir="data/video", embedding_type="segment", analyze=True)
+pipeline = PoseExtractionPipeline()
+results = pipeline.process_video_directory(input_dir="data/video")
+for result in results:
+    print(f"Processed {result['video_name']}: {result['pose_csv_path']}")
 ```
 
-## 6. Command-Line Usage (from project root)
+## 4. Command-Line Usage (from project root)
 
 You can also run the pipeline from the command line:
 
 ```bash
-python -m dance_motion_embedding.main --video data/video/your_video.mp4
+python -m pose_extraction.main --video data/video/your_video.mp4
 # Or batch process:
-python -m dance_motion_embedding.main --input-dir data/video
+python -m pose_extraction.main --input-dir data/video
 ```
 
 ## Notes
-- All outputs (CSV, embeddings, analysis) are saved in the `data/` subfolders.
+- All outputs (CSV files) are saved in the `data/poses/` folder.
 - For more advanced usage, see the [examples/basic_usage.py](../../examples/basic_usage.py) script.
-- For troubleshooting and more details, see the main project [README](../../README.md). 
+- For troubleshooting and more details, see the main project [README](../../README.md).
+- This module focuses only on pose extraction. For embedding generation and motion analysis, see the separate modules. 

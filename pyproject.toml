@@ -3,16 +3,16 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "dance-motion-embedding"
+name = "pose-extraction"
 version = "0.1.0"
-description = "A comprehensive system for converting dance videos into pose time series data using MediaPipe's AI pose estimation, generating vector embeddings for poses and movement segments, and enabling motion analysis in high-dimensional space."
+description = "A focused system for extracting pose landmarks from dance videos using MediaPipe's AI pose estimation and exporting to CSV format."
 readme = "README.md"
 requires-python = ">=3.9,<3.13"
 license = {text = "MIT"}
 authors = [
     {name = "Your Name", email = "your.email@example.com"},
 ]
-keywords = ["dance", "motion", "embedding", "mediapipe", "rerun", "pose-estimation"]
+keywords = ["dance", "motion", "pose-estimation", "mediapipe", "rerun"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -40,18 +40,8 @@ dependencies = [
     # Rerun for visualization
     "rerun-sdk>=0.10.0",
     
-    # Machine learning and deep learning
-    "torch>=1.12.0",
-    "scikit-learn>=1.1.0",
-    "umap-learn>=0.5.7",
-    
-    # Visualization
-    "matplotlib>=3.5.0",
-    "plotly>=5.0.0",
-    
     # Utilities
     "pathlib2>=2.3.0; python_version < '3.4'",
-    "flask>=2.0",
 ]
 
 [project.optional-dependencies]
@@ -71,21 +61,17 @@ docs = [
     "myst-parser>=0.18.0",
 ]
 
-gpu = [
-    "torch>=1.12.0",
-]
-
 [project.scripts]
-dance-motion-embedding = "dance_motion_embedding.main:main"
+pose-extraction = "pose_extraction.main:main"
 
 [project.urls]
-Homepage = "https://github.com/yourusername/dance-motion-embedding"
-Documentation = "https://dance-motion-embedding.readthedocs.io/"
-Repository = "https://github.com/yourusername/dance-motion-embedding"
-"Bug Tracker" = "https://github.com/yourusername/dance-motion-embedding/issues"
+Homepage = "https://github.com/yourusername/pose-extraction"
+Documentation = "https://pose-extraction.readthedocs.io/"
+Repository = "https://github.com/yourusername/pose-extraction"
+"Bug Tracker" = "https://github.com/yourusername/pose-extraction/issues"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/dance_motion_embedding"]
+packages = ["src/pose_extraction"]
 
 [tool.black]
 line-length = 88
@@ -109,7 +95,7 @@ extend-exclude = '''
 profile = "black"
 multi_line_output = 3
 line_length = 88
-known_first_party = ["dance_motion_embedding"]
+known_first_party = ["pose_extraction"]
 
 [tool.mypy]
 python_version = "3.9"
@@ -130,8 +116,6 @@ strict_equality = true
 module = [
     "mediapipe.*",
     "cv2.*",
-    "plotly.*",
-    "umap.*",
 ]
 ignore_missing_imports = true
 
@@ -143,7 +127,7 @@ python_functions = ["test_*"]
 addopts = [
     "--strict-markers",
     "--strict-config",
-    "--cov=dance_motion_embedding",
+    "--cov=pose_extraction",
     "--cov-report=term-missing",
     "--cov-report=html",
 ]
@@ -154,7 +138,7 @@ markers = [
 ]
 
 [tool.coverage.run]
-source = ["src/dance_motion_embedding"]
+source = ["src/pose_extraction"]
 omit = [
     "*/tests/*",
     "*/test_*",

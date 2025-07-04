@@ -15,9 +15,9 @@ A comprehensive system for converting dance videos into pose time series data us
 
 The system consists of three main components:
 
-1. **Pose Extraction** (`pose_extraction.py`): Uses MediaPipe and Rerun to extract pose landmarks from videos
-2. **Embedding Generation** (`embedding_generator.py`): Creates vector embeddings using Transformer or LSTM models
-3. **Motion Analysis** (`motion_analyzer.py`): Analyzes embeddings using dimensionality reduction and clustering
+1. **Pose Extraction** (`src/pose_extraction/`): Uses MediaPipe and Rerun to extract pose landmarks from videos
+2. **Dimension Reduction** (`src/dimension_reduction/`): Creates visualizations and interactive analysis
+3. **Embedding Generation** (planned): Will create vector embeddings using Transformer or LSTM models
 
 ## 📦 Installation
 
@@ -88,10 +88,10 @@ Get up and running in minutes with these simple steps:
 3. **Extract pose data from the video**:
    ```bash
    # auto list videos and extract pose
-   python -m dance_motion_embedding.pose_extraction
-
+   python -m pose_extraction.pose_extraction
+ 
    # or specify video
-   python -m dance_motion_embedding.pose_extraction --video data/video/dance_video.mp4
+   python -m pose_extraction.pose_extraction --video data/video/dance_video.mp4
    ```
    This will create a CSV file with pose landmarks in `data/poses/`.
 
@@ -99,7 +99,7 @@ Get up and running in minutes with these simple steps:
    ```bash
    # auto run
    python -m dimension_reduction.main
-
+ 
    # Basic visualization with default settings
    python -m dimension_reduction.main --video data/video/dance_video.mp4 --pose-csv data/poses/dance_video.csv
    
@@ -129,78 +129,59 @@ uv pip install -e ".[dev]"
 
 ### Command Line Interface
 
-Process a single video:
+Extract poses from a single video:
 ```bash
-python -m dance_motion_embedding.main --video data/video/dance.mp4
+python -m pose_extraction.main --video data/video/dance.mp4
 ```
 
-Process all videos in a directory:
+Extract poses from all videos in a directory:
 ```bash
-python -m dance_motion_embedding.main --input-dir data/video
+python -m pose_extraction.main --input-dir data/video
 ```
 
-Generate embeddings only (skip analysis):
+Use Rerun visualization:
 ```bash
-python -m dance_motion_embedding.main --video data/video/dance.mp4 --no-analyze
-```
-
-Use LSTM model with GPU:
-```bash
-python -m dance_motion_embedding.main --video data/video/dance.mp4 --model lstm --device cuda
+python -m pose_extraction.main --video data/video/dance.mp4 --use-rerun
 ```
 
 ### Python API
 
 ```python
-from dance_motion_embedding import DanceMotionEmbeddingPipeline
+from pose_extraction import PoseExtractionPipeline
 
 # Initialize pipeline
-pipeline = DanceMotionEmbeddingPipeline(
-    use_rerun=False,  # Set to True for visualization
-    model_type="transformer",
-    device="cpu"
-)
+pipeline = PoseExtractionPipeline(use_rerun=False)  # Set to True for visualization
 
-# Run full pipeline
+# Run pose extraction pipeline
 results = pipeline.run_full_pipeline("data/video/dance.mp4")
 
 print(f"Pose data: {results['pose_csv_path']}")
-print(f"Embeddings: {results['embeddings_path']}")
-print(f"Analysis: {results['analysis_dir']}")
 ```
 
 ### Individual Components
 
 ```python
-from dance_motion_embedding import PoseExtractor, EmbeddingGenerator, MotionAnalyzer
+from pose_extraction import PoseExtractor
 
-# 1. Extract poses
+# Extract poses
 extractor = PoseExtractor(use_rerun=True)
 pose_data = extractor.extract_pose_from_video("data/video/dance.mp4")
-
-# 2. Generate embeddings
-generator = EmbeddingGenerator(model_type="transformer")
-embeddings = generator.process_csv_file("data/poses/dance.csv")
-
-# 3. Analyze motion
-analyzer = MotionAnalyzer(method="umap")
-results = analyzer.analyze_motion_patterns(embeddings)
 ```
 
 ## 📁 Project Structure
 
 ```
 motion_embedding/
-├── src/dance_motion_embedding/
+├── src/pose_extraction/
 │   ├── __init__.py              # Main package
 │   ├── pose_extraction.py       # Pose extraction using MediaPipe
-│   ├── embedding_generator.py   # Embedding generation models
-│   ├── motion_analyzer.py       # Motion analysis and visualization
-│   └── main.py                  # Complete pipeline
+│   └── main.py                  # Pose extraction pipeline
+├── src/dimension_reduction/
+│   ├── main.py                  # Dimension reduction and visualization
+│   └── webapp/                  # Web application
 ├── data/
 │   ├── video/                   # Input video files
 │   ├── poses/                   # Extracted pose CSV files
-│   ├── embeddings/              # Generated embeddings
 │   └── analysis/                # Analysis results and visualizations
 ├── examples/
 │   └── basic_usage.py           # Usage examples
@@ -231,12 +212,6 @@ timestamp,frame_number,nose_x,nose_y,nose_z,nose_confidence,...
 0.033,1,321.1,239.8,0.12,0.94,...
 ```
 
-### Embedding Format
-
-Embeddings are saved as:
-- `.npy` files: NumPy arrays for efficient loading
-- `.csv` files: Human-readable format for inspection
-
 ## 🎨 Visualization
 
 The system provides several visualization options:
@@ -248,26 +223,22 @@ The system provides several visualization options:
 ### Enabling Rerun Visualization
 
 ```bash
-python -m dance_motion_embedding.main --video data/video/dance.mp4 --use-rerun
+python -m pose_extraction.main --video data/video/dance.mp4 --use-rerun
 ```
 
 ## 🔧 Configuration
 
-### Model Types
+### Pose Extraction Options
 
-- **Transformer**: Attention-based model for sequence processing
-- **LSTM**: Recurrent neural network with attention mechanism
+- **Rerun Visualization**: Real-time 3D pose tracking during extraction
+- **Output Format**: CSV with timestamps and confidence scores
+- **Keypoints**: 33 MediaPipe pose landmarks
 
-### Dimensionality Reduction Methods
+### Dimension Reduction Methods
 
 - **UMAP**: Uniform Manifold Approximation and Projection (default)
 - **t-SNE**: t-Distributed Stochastic Neighbor Embedding
 - **PCA**: Principal Component Analysis
-
-### Clustering Methods
-
-- **K-means**: Partition-based clustering
-- **DBSCAN**: Density-based clustering
 
 ## 📈 Performance
 
@@ -276,15 +247,13 @@ python -m dance_motion_embedding.main --video data/video/dance.mp4 --use-rerun
 - **Python 3.9** (required)
 - **CPU**: Intel i5 or equivalent (minimum)
 - **RAM**: 8GB (minimum), 16GB (recommended)
-- **GPU**: Optional, supports CUDA for acceleration
 - **Storage**: 1GB per minute of video (approximate)
 
 ### Optimization Tips
 
-1. **Use GPU**: Set `device="cuda"` for faster embedding generation
+1. **Rerun**: Disable Rerun visualization for faster processing
 2. **Batch Processing**: Process multiple videos in parallel
-3. **Memory Management**: Use smaller sequence lengths for large videos
-4. **Rerun**: Disable Rerun visualization for faster processing
+3. **Memory Management**: Use smaller video files for large datasets
 
 ## 🧪 Testing
 
@@ -295,7 +264,7 @@ Run the test suite:
 pytest
 
 # Run with coverage
-pytest --cov=dance_motion_embedding
+pytest --cov=pose_extraction
 
 # Run specific test
 python tests/test_imports.py
