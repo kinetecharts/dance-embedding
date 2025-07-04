@@ -42,6 +42,9 @@ dependencies = [
     
     # Utilities
     "pathlib2>=2.3.0; python_version < '3.4'",
+    
+    # Monitoring
+    "watchdog>=3.0.0",
 ]
 
 [project.optional-dependencies]

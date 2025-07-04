@@ -104,7 +104,7 @@ function renderPlot() {
             colorscale: 'Viridis',
             colorbar: { title: 'Time (s)' }
         },
-        line: { color: 'red', width: 2 },
+        line: { color: 'red', width: 1 },
         text: frameNumbers.map((f, i) => `Frame ${f}<br>Time: ${timestamps[i].toFixed(2)}s`),
         hovertemplate: '%{text}<extra></extra>',
         name: 'Trajectory'

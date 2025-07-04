@@ -90,7 +90,7 @@ def list_videos():
     files = [f.name for f in VIDEO_DIR.glob("*") 
              if f.is_file() and f.suffix.lower() in video_extensions 
              and not f.name.startswith('.')]
-    return jsonify(files)
+    return jsonify(sorted(files))
 
 @app.route("/list_poses")
 def list_poses():
@@ -107,10 +107,12 @@ def list_reductions_for_video(video_basename):
     # Find all reduced files for this video and extract method names
     files = [f.name for f in REDUCED_DIR.glob(f"{video_basename}_*_reduced.csv") if f.is_file()]
     methods = []
+    prefix = f"{video_basename}_"
+    suffix = "_reduced.csv"
     for fname in files:
-        parts = fname.split('_')
-        if len(parts) >= 3:
-            methods.append(parts[1])  # e.g., kurt_umap_reduced.csv -> 'umap'
+        if fname.startswith(prefix) and fname.endswith(suffix):
+            method = fname[len(prefix):-len(suffix)]
+            methods.append(method)
     return jsonify(sorted(set(methods)))
 
 @app.route('/static/<path:filename>')
