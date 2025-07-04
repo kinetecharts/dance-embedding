@@ -13,23 +13,33 @@ This README provides step-by-step instructions for running the pose extraction p
 
 ## Pose Extraction: Video to 3D Pose CSV
 
-The `pose_extraction.py` module extracts 2D and 3D pose landmarks from videos using MediaPipe and exports them to CSV format with timestamps.
+The `pose_extraction.py` module extracts 2D and 3D pose landmarks from videos using MediaPipe and exports them to CSV format with timestamps. It also generates overlay videos showing the detected poses for review.
 
 ### Command-Line Usage
 
-Extract poses from a single video:
+Extract poses from all videos in data/video (default):
 ```bash
-python -m pose_extraction.pose_extraction --video data/video/your_video.mp4
+python -m pose_extraction.main
 ```
 
-Extract poses from all videos in a directory:
+Extract poses from a single video:
 ```bash
-python -m pose_extraction.pose_extraction --input-dir data/video
+python -m pose_extraction.main --video data/video/your_video.mp4
+```
+
+Extract poses from all videos in a specific directory:
+```bash
+python -m pose_extraction.main --input-dir data/video
 ```
 
 With Rerun visualization (real-time 3D pose tracking):
 ```bash
-python -m pose_extraction.pose_extraction --video data/video/your_video.mp4 --use-rerun
+python -m pose_extraction.main --video data/video/your_video.mp4 --use-rerun
+```
+
+Disable overlay video generation (faster processing):
+```bash
+python -m pose_extraction.main --no-overlay-video
 ```
 
 ### Python API Usage
@@ -38,7 +48,7 @@ python -m pose_extraction.pose_extraction --video data/video/your_video.mp4 --us
 from pose_extraction import PoseExtractor
 
 # Initialize extractor
-extractor = PoseExtractor(use_rerun=False)  # Set to True for visualization
+extractor = PoseExtractor(use_rerun=False, generate_overlay_video=True)  # Set to False to disable overlay videos
 
 # Extract poses from a single video
 pose_data = extractor.extract_pose_from_video("data/video/your_video.mp4")
@@ -47,6 +57,13 @@ print(f"Extracted pose data from {len(pose_data)} frames")
 # Process all videos in a directory
 extractor.process_video_directory("data/video", "data/poses")
 ```
+
+### Output Files
+
+The system generates two types of output files:
+
+1. **CSV files**: Pose landmark data saved in `data/poses/` with the same name as the input video
+2. **Overlay videos**: Videos with pose landmarks overlaid, saved in `data/video_with_pose/` with `_with_pose` suffix
 
 ### CSV Output Format
 
@@ -65,17 +82,21 @@ timestamp,frame_number,nose_x,nose_y,nose_z,nose_confidence,left_eye_x,left_eye_
 0.033,1,321.1,239.8,0.12,0.94,316.1,235.1,0.13,0.93,...
 ```
 
+### Overlay Video Features
+
+The generated overlay videos include:
+- **Pose landmarks**: Blue circles with white borders for each detected keypoint
+- **Pose connections**: Green lines connecting related body parts
+- **Confidence filtering**: Only high-confidence landmarks (>0.5) are displayed
+- **Frame information**: Text overlay showing the number of detected landmarks
+- **Original video quality**: Same resolution and frame rate as the input video
+
 ### Supported Keypoints
 
 The system extracts 33 pose keypoints including:
 - Face: nose, eyes, ears, mouth
 - Upper body: shoulders, elbows, wrists, fingers
 - Lower body: hips, knees, ankles, feet
-
-### Output Files
-
-- **CSV files**: Saved in `data/poses/` with the same name as the input video
-- **Rerun visualization**: Real-time 3D pose tracking (if enabled)
 
 ## 1. Extract Poses from a Video
 
@@ -84,9 +105,9 @@ You can extract pose data from a single video file using the `PoseExtractor` cla
 ```python
 from pose_extraction import PoseExtractor
 
-extractor = PoseExtractor(use_rerun=True)  # Set to False to disable Rerun visualization
+extractor = PoseExtractor(use_rerun=True, generate_overlay_video=True)  # Set to False to disable features
 pose_data = extractor.extract_pose_from_video("data/video/your_video.mp4")
-print(f"Extracted {len(pose_data)} frames. CSV saved in data/poses/")
+print(f"Extracted {len(pose_data)} frames. CSV saved in data/poses/, overlay video in data/video_with_pose/")
 ```
 
 ## 2. Run the Full Pipeline (Recommended)
@@ -96,10 +117,12 @@ You can run the complete pose extraction pipeline using the main pipeline class:
 ```python
 from pose_extraction.main import PoseExtractionPipeline
 
-pipeline = PoseExtractionPipeline(use_rerun=False)
+pipeline = PoseExtractionPipeline(use_rerun=False, generate_overlay_video=True)
 results = pipeline.run_full_pipeline("data/video/your_video.mp4")
 print("Pipeline complete!")
 print(f"Pose CSV: {results['pose_csv_path']}")
+print(f"Overlay video: {results['overlay_video_path']}")
+print(f"Frames processed: {results['frame_count']}")
 ```
 
 ## 3. Batch Processing: All Videos in a Directory
@@ -111,6 +134,8 @@ pipeline = PoseExtractionPipeline()
 results = pipeline.process_video_directory(input_dir="data/video")
 for result in results:
     print(f"Processed {result['video_name']}: {result['pose_csv_path']}")
+    if result.get('overlay_video_path'):
+        print(f"  Overlay video: {result['overlay_video_path']}")
 ```
 
 ## 4. Command-Line Usage (from project root)
@@ -125,6 +150,8 @@ python -m pose_extraction.main --input-dir data/video
 
 ## Notes
 - All outputs (CSV files) are saved in the `data/poses/` folder.
+- Overlay videos are saved in the `data/video_with_pose/` folder.
+- Use `--no-overlay-video` flag for faster processing when overlay videos aren't needed.
 - For more advanced usage, see the [examples/basic_usage.py](../../examples/basic_usage.py) script.
 - For troubleshooting and more details, see the main project [README](../../README.md).
 - This module focuses only on pose extraction. For embedding generation and motion analysis, see the separate modules. 

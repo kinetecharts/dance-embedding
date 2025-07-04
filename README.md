@@ -87,13 +87,13 @@ Get up and running in minutes with these simple steps:
 
 3. **Extract pose data from the video**:
    ```bash
-   # auto list videos and extract pose
-   python -m pose_extraction.pose_extraction
+   # Process all videos in data/video (default)
+   python -m pose_extraction.main
  
    # or specify video
-   python -m pose_extraction.pose_extraction --video data/video/dance_video.mp4
+   python -m pose_extraction.main --video data/video/dance_video.mp4
    ```
-   This will create a CSV file with pose landmarks in `data/poses/`.
+   This will create a CSV file with pose landmarks in `data/poses/` and an overlay video in `data/video_with_pose/` for review.
 
 4. **Run dimension reduction and create visualizations**:
    ```bash
@@ -182,6 +182,7 @@ motion_embedding/
 ├── data/
 │   ├── video/                   # Input video files
 │   ├── poses/                   # Extracted pose CSV files
+│   ├── video_with_pose/         # Videos with pose overlays for review
 │   └── analysis/                # Analysis results and visualizations
 ├── examples/
 │   └── basic_usage.py           # Usage examples

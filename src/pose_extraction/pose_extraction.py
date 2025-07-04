@@ -41,6 +41,18 @@ POSE_KEYPOINTS: Final = [
 # MediaPipe pose model URL
 POSE_MODEL_URL = "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_heavy/float16/1/pose_landmarker_heavy.task"
 
+# Pose connections for drawing
+POSE_CONNECTIONS = [
+    (11, 12), (11, 13), (13, 15), (12, 14), (14, 16),  # Arms
+    (11, 23), (12, 24), (23, 24),  # Torso
+    (23, 25), (25, 27), (27, 29), (29, 31),  # Left leg
+    (24, 26), (26, 28), (28, 30), (30, 32),  # Right leg
+    (15, 17), (15, 19), (15, 21), (16, 18), (16, 20), (16, 22),  # Hands
+    (27, 31), (28, 32),  # Feet
+    (0, 1), (1, 2), (2, 3), (3, 7), (0, 4), (4, 5), (5, 6), (6, 8),  # Face
+    (9, 10),  # Mouth
+]
+
 
 @dataclass
 class VideoFrame:
@@ -101,14 +113,16 @@ class VideoSource:
 class PoseExtractor:
     """Extracts pose data from videos using MediaPipe and Rerun."""
     
-    def __init__(self, model_path: str | None = None, use_rerun: bool = False):
+    def __init__(self, model_path: str | None = None, use_rerun: bool = False, generate_overlay_video: bool = True):
         """Initialize the pose extractor.
         
         Args:
             model_path: Path to MediaPipe model file. If None, uses default.
             use_rerun: Whether to use Rerun for visualization.
+            generate_overlay_video: Whether to generate a video with pose overlays.
         """
         self.use_rerun = use_rerun
+        self.generate_overlay_video = generate_overlay_video
         
         # Get model path
         if model_path is None:
@@ -165,12 +179,44 @@ class PoseExtractor:
         )
         rr.log("person", rr.ViewCoordinates.RIGHT_HAND_Y_DOWN, static=True)
     
-    def extract_pose_from_video(self, video_path: str, output_path: str | None = None) -> list[PoseData]:
+    def _draw_pose_overlay(self, frame: np.ndarray, landmarks_2d: npt.NDArray[np.float32] | None, 
+                          confidence_scores: list[float] | None) -> np.ndarray:
+        """Draw pose landmarks and connections on the frame."""
+        if landmarks_2d is None:
+            return frame
+        
+        overlay = frame.copy()
+        
+        # Draw connections
+        for connection in POSE_CONNECTIONS:
+            if (connection[0] < len(landmarks_2d) and connection[1] < len(landmarks_2d) and
+                confidence_scores and confidence_scores[connection[0]] > 0.5 and confidence_scores[connection[1]] > 0.5):
+                
+                pt1 = (int(landmarks_2d[connection[0]][0]), int(landmarks_2d[connection[0]][1]))
+                pt2 = (int(landmarks_2d[connection[1]][0]), int(landmarks_2d[connection[1]][1]))
+                cv2.line(overlay, pt1, pt2, (0, 255, 0), 2)
+        
+        # Draw landmarks
+        for i, landmark in enumerate(landmarks_2d):
+            if confidence_scores and confidence_scores[i] > 0.5:
+                x, y = int(landmark[0]), int(landmark[1])
+                cv2.circle(overlay, (x, y), 2, (255, 0, 0), -1)  # smaller filled
+                cv2.circle(overlay, (x, y), 3, (255, 255, 255), 1)  # smaller outline
+        
+        # Add frame info
+        cv2.putText(overlay, f"Frame: {len(landmarks_2d)} landmarks", (10, 30), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+        
+        return overlay
+    
+    def extract_pose_from_video(self, video_path: str, output_path: str | None = None, 
+                               overlay_video_path: str | None = None) -> list[PoseData]:
         """Extract pose data from a video file.
         
         Args:
             video_path: Path to the input video file.
             output_path: Path to save the CSV file. If None, auto-generates based on video path.
+            overlay_video_path: Path to save the overlay video. If None, auto-generates.
             
         Returns:
             List of pose data for each frame.
@@ -180,8 +226,15 @@ class PoseExtractor:
             video_name = Path(video_path).stem
             output_path = f"data/poses/{video_name}.csv"
         
-        # Ensure output directory exists
+        if overlay_video_path is None and self.generate_overlay_video:
+            # Generate overlay video path
+            video_name = Path(video_path).stem
+            overlay_video_path = f"data/video_with_pose/{video_name}_with_pose.mp4"
+        
+        # Ensure output directories exist
         os.makedirs(Path(output_path).parent, exist_ok=True)
+        if overlay_video_path:
+            os.makedirs(Path(overlay_video_path).parent, exist_ok=True)
         
         pose_data_list = []
         
@@ -194,6 +247,19 @@ class PoseExtractor:
             output_segmentation_masks=False,
         )
         pose_landmarker = mp.tasks.vision.PoseLandmarker.create_from_options(options)
+        
+        # Setup video writer for overlay video
+        video_writer = None
+        if overlay_video_path:
+            cap = cv2.VideoCapture(video_path)
+            fps = cap.get(cv2.CAP_PROP_FPS)
+            width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            cap.release()
+            
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            video_writer = cv2.VideoWriter(overlay_video_path, fourcc, fps, (width, height))
+        
         with closing(VideoSource(video_path)) as video_source:
             # Count total frames and get fps for progress bar
             cap = cv2.VideoCapture(video_path)
@@ -201,20 +267,24 @@ class PoseExtractor:
             cap.release()
             frame_iter = video_source.stream_bgr()
             last_time = -1
+            
             for frame in tqdm(frame_iter, total=total_frames, desc=f"Frames ({Path(video_path).name})", leave=False):
                 # Use embedded timecode, but force monotonicity if needed
                 if frame.time <= last_time:
                     frame.time = last_time + 1e-6
                 last_time = frame.time
+                
                 mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame.data)
                 if self.use_rerun:
                     rr.set_time("time", duration=frame.time)
                     rr.set_time("frame_idx", sequence=frame.idx)
+                
                 results = pose_landmarker.detect_for_video(mp_image, int(frame.time * 1000))
                 h, w, _ = frame.data.shape
                 landmarks_2d = self._read_landmark_positions_2d(results, w, h)
                 landmarks_3d = self._read_landmark_positions_3d(results)
                 confidence_scores = self._extract_confidence_scores(results)
+                
                 pose_data = PoseData(
                     timestamp=frame.time,
                     frame_number=frame.idx,
@@ -223,8 +293,19 @@ class PoseExtractor:
                     confidence_scores=confidence_scores
                 )
                 pose_data_list.append(pose_data)
+                
+                # Generate overlay video frame
+                if video_writer and landmarks_2d is not None:
+                    overlay_frame = self._draw_pose_overlay(frame.data, landmarks_2d, confidence_scores)
+                    video_writer.write(overlay_frame)
+                
                 if self.use_rerun:
                     self._log_to_rerun(frame, landmarks_2d, landmarks_3d)
+        
+        # Close video writer
+        if video_writer:
+            video_writer.release()
+            logger.info(f"Generated overlay video: {overlay_video_path}")
         
         # Export to CSV
         self._export_to_csv(pose_data_list, output_path)
@@ -388,60 +469,5 @@ class PoseExtractor:
         logger.info("Finished processing all videos")
 
 
-def get_unprocessed_videos(video_dir, pose_dir):
-    video_dir = Path(video_dir)
-    pose_dir = Path(pose_dir)
-    video_extensions = {'.mp4', '.avi', '.mov', '.webm', '.mkv'}
-    video_files = [f for f in video_dir.glob("*") if f.is_file() and f.suffix.lower() in video_extensions]
-    processed_bases = {f.stem for f in pose_dir.glob("*.csv")}
-    unprocessed = [f for f in video_files if f.stem not in processed_bases]
-    return unprocessed
-
-
-def main():
-    """Main function for command-line usage."""
-    import argparse
-    
-    parser = argparse.ArgumentParser(description="Extract pose data from dance videos")
-    parser.add_argument("--video", type=str, help="Path to video file")
-    parser.add_argument("--input-dir", type=str, default="data/video", help="Input directory for videos")
-    parser.add_argument("--output-dir", type=str, default="data/poses", help="Output directory for CSV files")
-    parser.add_argument("--use-rerun", action="store_true", help="Use Rerun for visualization")
-    parser.add_argument("--model-path", type=str, help="Path to MediaPipe model")
-    
-    args = parser.parse_args()
-    
-    extractor = PoseExtractor(model_path=args.model_path, use_rerun=args.use_rerun)
-    
-    if args.video:
-        # Process single video
-        extractor.extract_pose_from_video(args.video)
-    else:
-        # Process all videos in directory
-        video_dir = Path(args.input_dir)
-        pose_dir = Path(args.output_dir)
-        unprocessed_videos = get_unprocessed_videos(video_dir, pose_dir)
-        if not unprocessed_videos:
-            print("All videos already processed. No new files to process.")
-            return
-        print(f"Videos to process: {[f.name for f in unprocessed_videos]}")
-        for video_file in tqdm(unprocessed_videos, desc="Processing videos"):
-            logger.info(f"Processing {video_file.name}")
-            try:
-                output_file = pose_dir / f"{video_file.stem}.csv"
-                extractor.extract_pose_from_video(str(video_file), str(output_file))
-            except Exception as e:
-                logger.error(f"Error processing {video_file.name}: {e}")
-                continue
-        
-        # Optionally, print skipped files
-        processed_bases = {f.stem for f in pose_dir.glob("*.csv")}
-        skipped = [f for f in video_dir.glob("*") if f.stem in processed_bases]
-        if skipped:
-            print(f"Skipped already processed: {[f.name for f in skipped]}")
-        
-        logger.info("Finished processing all videos")
-
-
-if __name__ == "__main__":
-    main() 
+# Remove the main function and CLI - this should be a pure module
+# The CLI is handled in main.py 
