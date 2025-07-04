@@ -166,6 +166,7 @@ data/video/
 data/poses/
 data/embeddings/
 data/analysis/
+data/dimension_reduction/
 *.mp4
 *.avi
 *.mov
