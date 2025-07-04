@@ -85,7 +85,6 @@ loadBtn.onclick = async function() {
     videoDuration = timestamps[timestamps.length - 1] || 0;
     
     renderPlot();
-    setupTimeline();
     setupSync();
     // Notify 3D viewer that poseData is loaded
     document.dispatchEvent(new Event('poseDataLoaded'));
