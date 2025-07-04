@@ -42,4 +42,8 @@ h1 {
     width: 100%;
     height: 30px;
     margin-top: 10px;
+}
+/* Viridis color scale for noUiSlider connect bar */
+#rangeSlider .noUi-connect {
+    background: linear-gradient(to right, #440154, #21908d 50%, #fde725 100%);
 } 

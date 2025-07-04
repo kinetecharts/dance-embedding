@@ -5,6 +5,8 @@
     <title>Dance Motion Playback</title>
     <link rel="stylesheet" href="static/style.css">
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/nouislider@15.7.1/dist/nouislider.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/nouislider@15.7.1/dist/nouislider.min.js"></script>
 </head>
 <body>
 <div class="container">
@@ -27,6 +29,8 @@
     <div class="main-content" style="display: flex; flex-direction: column; align-items: center;">
         <div class="video-panel" style="margin-bottom: -20px;">
             <video id="videoPlayer" controls width="624"></video> <!-- 480 * 1.3 = 624 -->
+            <div id="rangeSlider" style="width: 624px; margin: 16px auto;"></div>
+            <div id="rangeLabel" style="text-align: center; margin-bottom: 8px; font-size: 1rem;"></div>
             <!-- <div id="timeline"></div> -->
         </div>
         <div class="plot-3d-row" style="display: flex; flex-direction: row; align-items: flex-start;">

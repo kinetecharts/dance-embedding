@@ -90,7 +90,7 @@ def list_videos():
     files = [f.name for f in VIDEO_DIR.glob("*") 
              if f.is_file() and f.suffix.lower() in video_extensions 
              and not f.name.startswith('.')]
-    return jsonify(sorted(files))
+    return jsonify(sorted(files, key=lambda x: x.lower()))
 
 @app.route("/list_poses")
 def list_poses():
