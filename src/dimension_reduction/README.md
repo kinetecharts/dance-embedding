@@ -271,19 +271,48 @@ To add new dimension reduction methods:
 
 This module is part of the Dance Motion Embedding System. 
 
-## Chunked Dimension Reduction (Sliding Window)
+## Improved Per-Frame Dimension Reduction Pipeline
 
-You can run chunked (sliding window) dimension reduction on pose data using `chunked_reduction.py`. This will create overlapping windows of 30 frames (stride 15), flatten each window, and run PCA, t-SNE, and UMAP on the resulting vectors. The output is one point per chunk, suitable for visualizing motion segments.
+This module now implements best practices for preparing and reducing high-dimensional pose data for motion analysis, matching the chunked pipeline:
 
-**Usage:**
+### Methodology
+
+1. **Normalize joint coordinates**: For each frame, subtract the root joint (left hip) position and divide by the mean torso length (shoulder-hip distance) for translation and scale invariance.
+2. **Flatten**: Concatenate all joint coordinates for each frame into a single vector.
+3. **Standardize features**: Use `StandardScaler` to ensure all features contribute equally.
+4. **PCA pre-reduction**: Run PCA and retain enough components to explain ~90–95% of the variance (configurable via `--pca-var`). This denoises and speeds up t-SNE/UMAP.
+5. **t-SNE/UMAP**: Run t-SNE or UMAP on the PCA-reduced data for visualization and structure discovery.
+
+**Why this works:**
+- Normalization removes bias from subject position/scale.
+- PCA pre-reduction denoises and improves t-SNE/UMAP quality.
+- t-SNE/UMAP reveal clusters and patterns in motion data.
+
+### Usage
 
 ```bash
-python src/dimension_reduction/chunked_reduction.py --pose-csv data/poses/YourVideo.csv
+python -m dimension_reduction.main --pose-csv data/poses/YourVideo.csv --method umap --pca-var 0.95
 ```
 
-- Outputs files like `YourVideo_c-pca_reduced.csv`, `YourVideo_c-tsne_reduced.csv`, `YourVideo_c-umap_reduced.csv` in `data/dimension_reduction/`.
-- Each row corresponds to a chunk (window) of 30 frames, flattened into a vector.
-- The reduced data is 2D by default (columns `c1`, `c2`).
-- Timestamps and frame numbers correspond to the first frame of each chunk.
+- Outputs files like `YourVideo_umap_reduced.csv` in `data/dimension_reduction/`.
+- Each row corresponds to a frame, normalized and standardized.
+- The reduced data is 2D or 3D (columns `x`, `y`, `z`).
+- Timestamps and frame numbers correspond to each frame.
+- Use `--pca-var` to set the variance threshold for PCA pre-reduction (default: 0.95).
 
-You can change chunk size, stride, or methods by editing the script or adding arguments. 
+### Step-by-Step Pipeline
+
+| Step | Transform | Purpose |
+|------|-----------|---------|
+| 1 | Normalize joint coords by root/scale | Remove pose location/scale bias |
+| 2 | Flatten joints into 1D vector | Create feature vector per frame |
+| 3 | Scale features | Equalize N-dimensional influence |
+| 4 | PCA → choose PCs (~90–95% var) | Speed + denoise before non-linear |
+| 5 | t-SNE / UMAP on PCA output | Visualize clusters/semantic patterns |
+
+### Tips
+- Tune hyperparameters:
+  - PCA: number of components via elbow or variance explained (`--pca-var`)
+  - t-SNE: perplexity (5–50)
+  - UMAP: n_neighbors, min_dist
+- For large datasets, UMAP is faster and more stable. 
