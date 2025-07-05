@@ -82,6 +82,12 @@ function update3DPose(frameIdx) {
     if (!window.poseData || !window.poseData[frameIdx]) return;
     const pose = window.poseData[frameIdx];
     const points = [];
+    // Log for debugging
+    // if (window.poseData && window.poseData[frameIdx] && window.poseData[frameIdx].timestamp !== undefined) {
+    //     console.log(`[3D Viewer] frameIdx: ${frameIdx}, poseTimestamp: ${window.poseData[frameIdx].timestamp}`);
+    // } else {
+    //     console.log(`[3D Viewer] frameIdx: ${frameIdx}, poseTimestamp: N/A`);
+    // }
     for (let i = 0; i < 33; i++) {
         const x = pose[`${POSE_KEYPOINTS[i]}_x`];
         const y = pose[`${POSE_KEYPOINTS[i]}_y`];

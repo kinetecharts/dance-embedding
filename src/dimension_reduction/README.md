@@ -270,3 +270,20 @@ To add new dimension reduction methods:
 ## License
 
 This module is part of the Dance Motion Embedding System. 
+
+## Chunked Dimension Reduction (Sliding Window)
+
+You can run chunked (sliding window) dimension reduction on pose data using `chunked_reduction.py`. This will create overlapping windows of 30 frames (stride 15), flatten each window, and run PCA, t-SNE, and UMAP on the resulting vectors. The output is one point per chunk, suitable for visualizing motion segments.
+
+**Usage:**
+
+```bash
+python src/dimension_reduction/chunked_reduction.py --pose-csv data/poses/YourVideo.csv
+```
+
+- Outputs files like `YourVideo_c-pca_reduced.csv`, `YourVideo_c-tsne_reduced.csv`, `YourVideo_c-umap_reduced.csv` in `data/dimension_reduction/`.
+- Each row corresponds to a chunk (window) of 30 frames, flattened into a vector.
+- The reduced data is 2D by default (columns `c1`, `c2`).
+- Timestamps and frame numbers correspond to the first frame of each chunk.
+
+You can change chunk size, stride, or methods by editing the script or adding arguments. 
