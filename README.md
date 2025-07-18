@@ -114,6 +114,23 @@ Get up and running in minutes with these simple steps:
 
    ![Dance Motion Web Interface](images/web_interface.png "Interactive web interface showing synchronized video and pose visualization")
 
+### Automatic Processing with Monitor
+
+For automatic processing of new videos as they are added:
+
+```bash
+# Start the monitor script to watch for new videos
+python monitor_videos.py
+```
+
+This script will:
+- Watch the `data/video/` directory for new video files
+- Automatically run pose extraction when a new video is detected
+- Run dimension reduction for all methods (PCA, t-SNE, UMAP) on the extracted pose data
+- Process videos in the background while you continue working
+
+**Note:** The first time you run pose extraction (either manually or via monitor), it may take several minutes as MediaPipe downloads its AI models (~100MB). Subsequent runs will be much faster.
+
 ### Development Setup
 
 For development, install with additional dependencies:
