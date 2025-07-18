@@ -105,11 +105,41 @@ class DimensionReductionVisualizer:
             confidence_threshold=confidence_threshold
         )
         
+        # PCA pre-reduction for t-SNE/UMAP (and t-SNE best practice)
+        if method == 'tsne':
+            from sklearn.decomposition import PCA
+            pca_var = kwargs.get('pca_var', 0.95) # Default to 95% variance
+            pca = PCA(n_components=min(features.shape[0], features.shape[1]), random_state=42)
+            X_pca_full = pca.fit_transform(features)
+            cumsum = np.cumsum(pca.explained_variance_ratio_)
+            n_pca = min(np.searchsorted(cumsum, pca_var) + 1, 30)  # Cap at 30 for t-SNE
+            features = X_pca_full[:, :n_pca]
+            logger.info(f"PCA pre-reduction for t-SNE: {n_pca} components (capped at 30) explain {cumsum[n_pca-1]*100:.1f}% variance")
+        elif method == 'umap':
+            from sklearn.decomposition import PCA
+            pca_var = kwargs.get('pca_var', 0.95) # Default to 95% variance
+            pca = PCA(n_components=min(features.shape[0], features.shape[1]), random_state=42)
+            X_pca_full = pca.fit_transform(features)
+            cumsum = np.cumsum(pca.explained_variance_ratio_)
+            n_pca = np.searchsorted(cumsum, pca_var) + 1
+            features = X_pca_full[:, :n_pca]
+            logger.info(f"PCA pre-reduction for UMAP: {n_pca} components explain {pca_var*100:.1f}% variance")
+        # For PCA, use the full standardized features
+        # For t-SNE, always use PCA pre-reduction (best practice)
+        # For UMAP, use PCA pre-reduction for speed/denoising
+        
         # Apply dimension reduction
         logger.info(f"Applying {method.upper()} reduction to {n_components}D...")
-        self.reduced_data, self.model = self.reduction_methods.reduce_dimensions(
-            features, method=method, n_components=n_components, **kwargs
-        )
+        # For t-SNE, allow passing perplexity from kwargs/CLI
+        if method == 'tsne':
+            perplexity = kwargs.get('perplexity', 30)
+            self.reduced_data, self.model = self.reduction_methods.reduce_dimensions(
+                features, method=method, n_components=n_components, perplexity=perplexity
+            )
+        else:
+            self.reduced_data, self.model = self.reduction_methods.reduce_dimensions(
+                features, method=method, n_components=n_components, **kwargs
+            )
         
         logger.info(f"Reduction complete. Data shape: {self.reduced_data.shape}")
         self.method = method  # Store for output file naming
