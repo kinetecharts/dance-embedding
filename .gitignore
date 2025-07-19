@@ -121,6 +121,7 @@ celerybeat.pid
 
 # Environments
 .env
+.env*
 .venv
 env/
 venv/
@@ -162,6 +163,7 @@ cython_debug/
 #  *.iws
 
 # Project-specific
+data/dev/
 data/video/
 data/poses/
 data/embeddings/
