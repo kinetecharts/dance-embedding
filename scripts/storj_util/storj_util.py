@@ -140,8 +140,9 @@ def download_file(
         # Ensure the local directory exists
         local_path.parent.mkdir(parents=True, exist_ok=True)
 
-        remote_path = f"{bucket_path}/{key}"
-        cmd = f"uplink cp {remote_path} {local_path}"
+        # Construct remote path - ensure proper formatting
+        remote_path = f"{bucket_path}/{key}" if not bucket_path.endswith('/') else f"{bucket_path}{key}"
+        cmd = f"uplink cp \"{remote_path}\" \"{local_path}\""
 
         logger.info(f"Downloading: {key}")
         result = subprocess.run(
@@ -163,8 +164,25 @@ def upload_file(
 ) -> bool:
     """Upload a single file from local to Storj."""
     try:
-        remote_path = f"{bucket_path}/{key}"
-        cmd = f"uplink cp {local_path} {remote_path}"
+        # Ensure parent directories exist in remote bucket
+        parent_dirs = Path(key).parent
+        if str(parent_dirs) != '.':
+            # Create parent directories if they don't exist
+            for parent in parent_dirs.parents:
+                if str(parent) != '.':
+                    remote_dir = f"{bucket_path}/{parent}" if not bucket_path.endswith('/') else f"{bucket_path}{parent}"
+                    try:
+                        subprocess.run(
+                            f"uplink mkdir \"{remote_dir}\"",
+                            shell=True, capture_output=True, text=True, check=False
+                        )
+                    except Exception:
+                        # Directory might already exist, continue
+                        pass
+
+        # Construct remote path - ensure proper formatting
+        remote_path = f"{bucket_path}/{key}" if not bucket_path.endswith('/') else f"{bucket_path}{key}"
+        cmd = f"uplink cp \"{local_path}\" \"{remote_path}\""
 
         logger.info(f"Uploading: {key}")
         _ = subprocess.run(cmd, shell=True, capture_output=True, text=True, check=True)

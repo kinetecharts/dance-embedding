@@ -77,13 +77,6 @@ python diff_storj_data.py --sync
 python diff_storj_data.py --sync --local-overwrites
 ```
 
-### Complete Example
-
-```bash
-# Compare and sync, allowing local files to overwrite remote conflicts
-python diff_storj_data.py --sync --local-overwrites --data-dir ./my-data
-```
-
 ## Command Line Options
 
 | Option | Description | Default |
@@ -102,6 +95,7 @@ python diff_storj_data.py --sync --local-overwrites --data-dir ./my-data
 ### 2. Comparison Logic
 
 The script identifies three types of differences:
+
 - **Only Remote**: Files that exist in Storj but not locally
 - **Only Local**: Files that exist locally but not in Storj  
 - **Different Sizes**: Files that exist in both places but have different file sizes
@@ -109,6 +103,7 @@ The script identifies three types of differences:
 ### 3. Synchronization Strategy
 
 When `--sync` is used:
+
 - **Only Remote files**: Downloaded to local directory (creates parent directories as needed)
 - **Only Local files**: Uploaded to remote bucket
 - **Different Sizes**: 
