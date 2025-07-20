@@ -2,6 +2,45 @@
 
 A real-time pose matching system that uses live camera input or video to find similar poses across multiple dance videos and automatically displays matching segments with side-by-side visualization.
 
+## 🚀 Quick Start - Test in 5 Minutes
+
+**Want to test the Dance Recall System quickly? Follow these steps:**
+
+### 1. Prerequisites
+```bash
+# Ensure you have pose data ready
+python -m pose_extraction.main --input-dir data/video
+
+# Build LanceDB database for fast matching
+python rebuild_database.py
+```
+
+### 2. Test with Live Camera
+```bash
+# Start real-time pose matching (fastest settings)
+python -m recall.main --mode camera --top-n 1 --match-interval 2.0 --playback-duration 3.0
+```
+
+### 3. Test with Video File
+```bash
+# Analyze a specific video file
+python -m recall.main --mode video --input data/video/your_video.mp4 --top-n 1 --match-interval 2.0
+```
+
+### What You'll See
+- **Left Window**: Live camera/video feed with red pose skeleton
+- **Right Window**: Matched reference video frame with green pose dots  
+- **Overlay Info**: Match details (video name, timestamp, similarity score)
+- **Controls**: Press 'q' to quit, 'p' to pause, 'r' to reset
+
+### Performance Tips
+- Use `--top-n 1` for fastest matching
+- Use `--match-interval 2.0` or higher for better performance
+- Ensure good lighting for camera mode
+- Works best with 3-10 reference videos in database
+
+---
+
 ## 🎯 Overview
 
 The Recall module enables:
@@ -41,7 +80,7 @@ Camera/Video Input → Pose Extraction → Normalization → Database Search →
 - **Real-time Metrics**: FPS, similarity scores, and system status
 - **Interactive Controls**: Keyboard shortcuts with visual feedback
 
-## 🚀 Quick Start
+## 🚀 Detailed Usage Guide
 
 ### 1. Setup Pose Database
 
@@ -129,6 +168,72 @@ config = RecallConfig(
 
 system = RecallSystem(config)
 system.run_live()
+```
+
+## 🗄️ LanceDB Database Management
+
+The Recall module uses LanceDB for efficient vector similarity search of pose embeddings.
+
+### Database Setup
+
+**Initial Creation**:
+```bash
+# Extract poses first
+python -m pose_extraction.main --input-dir data/video
+
+# Build LanceDB database
+python rebuild_database.py
+```
+
+**Rebuilding Database**:
+```bash
+# Clear and rebuild (removes existing data)
+python rebuild_database.py
+```
+
+**Programmatic Creation**:
+```python
+from recall.pose_embedding import create_pose_database
+
+# Create database with custom settings
+database = create_pose_database(
+    pose_dir="data/poses",
+    video_dir="data/video",
+    db_path="data/custom_database.lancedb"
+)
+```
+
+### Database Structure
+
+The LanceDB database contains:
+- **32-dimensional pose embeddings** (normalized, rotation-invariant)
+- **Video metadata** (filename, timestamp, frame number)
+- **Pose landmarks** and confidence scores
+- **Vector indices** for fast similarity search
+
+### Database Performance
+
+- **Search Speed**: 1-5ms per query (vs 100-500ms CSV search)
+- **Memory Usage**: 100-500MB for typical collections
+- **Scalability**: Efficient for 10,000+ poses
+- **Storage**: ~10-50MB per 1000 poses
+
+### Database Files
+
+- **Location**: `data/pose_database.lancedb/` (git-ignored)
+- **Format**: LanceDB vector database with embedded metadata
+- **Backup**: Database files are excluded from version control
+
+### Troubleshooting
+
+**Database Issues**:
+```bash
+# Check database stats
+python -c "from recall.pose_embedding import LanceDBPoseDatabase; db = LanceDBPoseDatabase(); print(db.get_database_stats())"
+
+# Rebuild if corrupted
+rm -rf data/pose_database.lancedb
+python rebuild_database.py
 ```
 
 ## 📁 Module Structure

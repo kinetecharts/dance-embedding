@@ -22,23 +22,51 @@ class VideoPlayer:
         self.config = config
         self.players = {}  # video_path -> player
         self.pose_cache = {}  # video_path -> List[PoseData]
+        self.frame_cache = {}  # (video_path, timestamp) -> frame
         self.playback_threads = {}  # video_path -> thread
         self.running = True
         self.current_match = None
         self.match_start_time = None
+        
+        # Pre-load all pose data for better performance
+        self._preload_all_poses()
+    
+    def _preload_all_poses(self):
+        """Pre-load all pose data to avoid repeated CSV loading"""
+        logger.info("Pre-loading all pose data for better performance...")
+        pose_dir = Path(self.config.pose_dir)
+        
+        for csv_file in pose_dir.glob("*.csv"):
+            video_stem = csv_file.stem
+            poses = self._load_poses_from_csv(csv_file)
+            self.pose_cache[video_stem] = poses
+            logger.info(f"Pre-loaded {len(poses)} poses for {video_stem}")
+        
+        logger.info(f"Pre-loaded pose data for {len(self.pose_cache)} videos")
     
     def play_match(self, match: Match):
         """Start playback for a match with synchronized dual-window display"""
         try:
-            # Store current match info for display (even if video playback fails)
+            # Store current match info for display
             self.current_match = match
             self.match_start_time = time.time()
             
             logger.info(f"🎬 Started match display for {Path(match.video_file).stem} at {match.timestamp:.2f}s")
             
-            # DISABLED: Video playback due to OpenCV crashes on macOS
-            # Just keep the match info for pose display
-            logger.info(f"Video playback disabled - showing matched pose only")
+            # Try to enable video playback
+            video_path = self._find_video_file(match.video_file)
+            if video_path:
+                self._create_player(video_path)
+                
+                # Seek to the matched timestamp
+                if video_path in self.players:
+                    player = self.players[video_path]
+                    self._seek_to_timestamp(player, match.timestamp)
+                    logger.info(f"Seeked to timestamp {match.timestamp:.2f}s for {Path(match.video_file).stem}")
+                
+                logger.info(f"Video playback enabled for {Path(match.video_file).stem}")
+            else:
+                logger.warning(f"Video file not found for {match.video_file}, showing pose only")
             
         except Exception as e:
             logger.error(f"Error starting match playback: {e}")
@@ -260,16 +288,44 @@ class VideoPlayer:
     
     def _display_match_frame(self, frame: np.ndarray, pose_data: Optional[PoseData], 
                            video_name: str, frame_count: int, max_frames: int):
-        """Display matched video frame with info - DISABLED due to OpenCV crashes on macOS"""
-        # Disable matched video window display since it's causing OpenCV crashes on macOS
-        # The matched video info is shown in the live camera window instead
-        pass
+        """Display matched video frame with info"""
+        try:
+            # Create window for matched video
+            window_name = f"Matched Video - {video_name}"
+            cv2.namedWindow(window_name, cv2.WINDOW_AUTOSIZE)
+            cv2.moveWindow(window_name, 700, 100)  # Position to the right of main window
+            
+            # Resize frame to reasonable size
+            display_frame = cv2.resize(frame, (640, 480))
+            
+            # Add overlay with video info
+            overlay = display_frame.copy()
+            cv2.rectangle(overlay, (10, 10), (400, 80), (0, 0, 0), -1)
+            cv2.addWeighted(overlay, 0.7, display_frame, 0.3, 0, display_frame)
+            
+            cv2.putText(display_frame, f"Matched Video: {video_name}", (20, 35), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+            cv2.putText(display_frame, f"Frame: {frame_count}/{max_frames}", (20, 55), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+            
+            # Draw pose landmarks on video frame if available
+            if pose_data is not None:
+                for i, (landmark, confidence) in enumerate(zip(pose_data.landmarks, pose_data.confidence)):
+                    if confidence > 0.5:
+                        x, y = int(landmark[0]), int(landmark[1])
+                        cv2.circle(display_frame, (x, y), 3, (0, 255, 0), -1)  # Green for matched pose
+            
+            # Display the frame
+            cv2.imshow(window_name, display_frame)
+            
+        except Exception as e:
+            logger.error(f"Error displaying matched video frame: {e}")
     
     def display_live_frame(self, frame: np.ndarray, pose_data: Optional[PoseData] = None, 
                           match_info: Optional[Match] = None):
-        """Display live video frame with match info and matched pose side by side"""
+        """Display live video frame with match info and matched video side by side"""
         try:
-            # Create a larger canvas to hold both live video and matched pose
+            # Create a larger canvas to hold both live video and matched video
             canvas_width = 1280  # Double the original width
             canvas_height = 480  # Keep original height
             canvas = np.zeros((canvas_height, canvas_width, 3), dtype=np.uint8)
@@ -343,115 +399,68 @@ class VideoPlayer:
             # Place live frame on left side of canvas
             canvas[:, :live_width] = live_frame_resized
             
-            # Create matched pose display on right side
-            matched_pose_canvas = np.zeros((live_height, live_width, 3), dtype=np.uint8)
+            # Create matched video display on right side
+            matched_video_canvas = np.zeros((live_height, live_width, 3), dtype=np.uint8)
             
-            # Add title for matched pose
-            cv2.putText(matched_pose_canvas, "Matched Pose", (20, 35), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-            
-            # Draw matched pose if available
+            # Try to get the current matched video frame
             if match_info:
-                # Try to load and display the actual matched video frame
-                video_path = self._find_video_file(match_info.video_file)
-                if video_path:
-                    try:
-                        # Create video capture for the matched video
-                        cap = cv2.VideoCapture(video_path)
-                        if cap.isOpened():
-                            # Seek to the matched timestamp
-                            fps = cap.get(cv2.CAP_PROP_FPS)
-                            frame_number = int(match_info.timestamp * fps)
-                            cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number)
+                try:
+                    # Find the video file path
+                    video_path = self._find_video_file(match_info.video_file)
+                    if video_path:
+                        # Get the frame at the matched timestamp
+                        matched_frame = self._get_frame_at_timestamp(video_path, match_info.timestamp)
+                        
+                        if matched_frame is not None:
+                            # Resize to fit the right side
+                            matched_frame_resized = cv2.resize(matched_frame, (live_width, live_height))
                             
-                            # Read the frame
-                            ret, matched_frame = cap.read()
-                            if ret:
-                                # Resize to fit the right side
-                                matched_frame_resized = cv2.resize(matched_frame, (live_width, live_height))
-                                matched_pose_canvas = matched_frame_resized.copy()
-                                
-                                # Add title overlay
-                                overlay = matched_pose_canvas.copy()
-                                cv2.rectangle(overlay, (10, 10), (300, 50), (0, 0, 0), -1)
-                                cv2.addWeighted(overlay, 0.7, matched_pose_canvas, 0.3, 0, matched_pose_canvas)
-                                cv2.putText(matched_pose_canvas, "Matched Video", (20, 35), 
-                                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+                            # Add overlay with video info
+                            overlay = matched_frame_resized.copy()
+                            cv2.rectangle(overlay, (10, 10), (300, 80), (0, 0, 0), -1)
+                            cv2.addWeighted(overlay, 0.7, matched_frame_resized, 0.3, 0, matched_frame_resized)
                             
-                            cap.release()
-                    except Exception as e:
-                        logger.error(f"Error loading matched video frame: {e}")
-                
-                # Get the matched pose data
-                pose_file = Path(self.config.pose_dir) / match_info.pose_file
-                logger.info(f"Trying to load matched pose from: {pose_file}")
-                logger.info(f"Match info: pose_file={match_info.pose_file}, pose_index={match_info.pose_index}")
-                
-                if pose_file.exists():
-                    # Load the specific pose from the match
-                    poses = self._load_poses_from_csv(pose_file)
-                    logger.info(f"Loaded {len(poses)} poses from {pose_file}")
-                    
-                    if match_info.pose_index < len(poses):
-                        matched_pose_data = poses[match_info.pose_index]
-                        logger.info(f"Using pose at index {match_info.pose_index}")
-                        
-                        # Draw matched pose landmarks on top of the video frame
-                        landmarks_drawn = 0
-                        for i, (landmark, confidence) in enumerate(zip(matched_pose_data.landmarks, matched_pose_data.confidence)):
-                            if confidence > 0.5:  # Only draw confident landmarks
-                                # The coordinates from CSV are in pixel coordinates from the original video
-                                # Let's normalize them to 0-1 range first using typical video dimensions
-                                # Since we don't know the exact original video dimensions, let's estimate
-                                # and scale them down to fit our canvas
-                                original_width = 1280  # Estimate original video width
-                                original_height = 720  # Estimate original video height
-                                
-                                # Normalize to 0-1 range
-                                x = landmark[0] / original_width
-                                y = landmark[1] / original_height
-                                
-                                # Scale to canvas
-                                x = int(x * live_width)
-                                y = int(y * live_height)
-                                
-                                # Debug: log first few landmarks
-                                if landmarks_drawn < 5:
-                                    logger.info(f"Landmark {i}: ({landmark[0]:.3f}, {landmark[1]:.3f}) -> ({x}, {y}), conf={confidence:.3f}")
-                                
-                                # Clamp coordinates to canvas bounds
-                                x = max(0, min(x, live_width - 1))
-                                y = max(0, min(y, live_height - 1))
-                                
-                                cv2.circle(matched_pose_canvas, (x, y), 4, (0, 255, 0), -1)  # Green for matched pose
-                                landmarks_drawn += 1
-                        
-                        logger.info(f"Drew {landmarks_drawn} landmarks for matched pose")
-                        
-                        # Add match details
-                        cv2.putText(matched_pose_canvas, f"Video: {video_name}", (20, 55), 
-                                   cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
-                        cv2.putText(matched_pose_canvas, f"Time: {timestamp:.2f}s", (20, 70), 
-                                   cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
-                        cv2.putText(matched_pose_canvas, f"Score: {score:.3f}", (20, 85), 
-                                   cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
-                        
-                        # Add legend
-                        cv2.putText(matched_pose_canvas, "Green: Matched, Red: Live", (20, live_height - 20), 
-                                   cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
+                            cv2.putText(matched_frame_resized, f"Matched Video: {Path(match_info.video_file).stem}", (20, 35), 
+                                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+                            cv2.putText(matched_frame_resized, f"Time: {match_info.timestamp:.2f}s", (20, 55), 
+                                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                            
+                            # Draw pose landmarks on matched video if available
+                            video_name = Path(match_info.video_file).stem
+                            if video_name in self.pose_cache and match_info.pose_index < len(self.pose_cache[video_name]):
+                                matched_pose_data = self.pose_cache[video_name][match_info.pose_index]
+                                for i, (landmark, confidence) in enumerate(zip(matched_pose_data.landmarks, matched_pose_data.confidence)):
+                                    if confidence > 0.5:
+                                        # Scale coordinates to match video frame
+                                        x = int(landmark[0] * live_width / 1280)  # Scale from original video width
+                                        y = int(landmark[1] * live_height / 720)  # Scale from original video height
+                                        x = max(0, min(x, live_width - 1))
+                                        y = max(0, min(y, live_height - 1))
+                                        cv2.circle(matched_frame_resized, (x, y), 4, (0, 255, 0), -1)  # Green for matched pose
+                            
+                            matched_video_canvas = matched_frame_resized
+                        else:
+                            # If no frame available, show placeholder
+                            cv2.putText(matched_video_canvas, "Video Frame Unavailable", (20, 35), 
+                                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (128, 128, 128), 2)
                     else:
-                        logger.error(f"Pose index {match_info.pose_index} out of range for {pose_file}")
-                else:
-                    logger.error(f"Pose file not found: {pose_file}")
+                        # Video file not found
+                        cv2.putText(matched_video_canvas, "Video File Not Found", (20, 35), 
+                                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+                        
+                except Exception as e:
+                    logger.error(f"Error reading matched video frame: {e}")
+                    cv2.putText(matched_video_canvas, "Video Error", (20, 35), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
             else:
                 # Show "No match" when no match is active
-                cv2.putText(matched_pose_canvas, "No match", (20, 55), 
+                cv2.putText(matched_video_canvas, "No match", (20, 55), 
                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (128, 128, 128), 1)
             
-            # Place matched pose on right side of canvas
-            canvas[:, live_width:] = matched_pose_canvas
+            # Place matched video on right side of canvas
+            canvas[:, live_width:] = matched_video_canvas
             
-            # Add separator line between live and matched pose
+            # Add separator line between live and matched video
             cv2.line(canvas, (live_width, 0), (live_width, canvas_height), (255, 255, 255), 2)
             
             # Add controls info at bottom
@@ -466,11 +475,13 @@ class VideoPlayer:
             # Display frame
             cv2.imshow("Dance Recall System", canvas)
             
-            # Force window to appear
-            cv2.waitKey(1)
+            # Handle key presses and return the key value
+            key = cv2.waitKey(1) & 0xFF
+            return key
             
         except Exception as e:
             logger.error(f"Error displaying live frame: {e}")
+            return -1
     
     def display_matched_pose(self, match: Match, live_pose: Optional[PoseData] = None):
         """Display matched pose in a separate window for comparison - DISABLED"""
@@ -484,6 +495,14 @@ class VideoPlayer:
             cv2.waitKey(1)
         except Exception as e:
             logger.error(f"Error clearing matched pose window: {e}")
+    
+    def cleanup(self):
+        """Clean up video player resources"""
+        try:
+            self.stop_all()
+            logger.info("Video player cleanup complete")
+        except Exception as e:
+            logger.error(f"Error during video player cleanup: {e}")
     
     def stop_all(self):
         """Stop all video players"""
@@ -505,6 +524,9 @@ class VideoPlayer:
         # Clear current match
         self.current_match = None
         self.match_start_time = None
+        
+        # Clear frame cache
+        self.frame_cache.clear()
         
         # Close video windows
         cv2.destroyAllWindows()
@@ -539,6 +561,57 @@ class VideoPlayer:
             return current_frame / fps if fps > 0 else 0.0
         except Exception as e:
             logger.error(f"Error getting video progress: {e}")
+            return None
+    
+    def _get_frame_at_timestamp(self, video_path: str, timestamp: float) -> Optional[np.ndarray]:
+        """Get a specific frame from a video at a given timestamp"""
+        try:
+            # Check if frame is already in cache
+            cache_key = (video_path, round(timestamp, 2))  # Round to 2 decimal places for caching
+            if cache_key in self.frame_cache:
+                return self.frame_cache[cache_key]
+
+            # Limit cache size to prevent memory issues
+            if len(self.frame_cache) > 100:  # Keep only last 100 frames
+                # Remove oldest entries
+                oldest_keys = list(self.frame_cache.keys())[:50]
+                for key in oldest_keys:
+                    del self.frame_cache[key]
+
+            # Create a temporary video capture for this specific frame
+            temp_cap = cv2.VideoCapture(video_path)
+            if not temp_cap.isOpened():
+                logger.error(f"Failed to open video for frame extraction: {video_path}")
+                return None
+            
+            # Get video properties
+            fps = temp_cap.get(cv2.CAP_PROP_FPS)
+            if fps <= 0:
+                logger.error(f"Invalid FPS for video: {video_path}")
+                temp_cap.release()
+                return None
+            
+            # Calculate frame number
+            frame_number = int(timestamp * fps)
+            
+            # Seek to the frame
+            temp_cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number)
+            
+            # Read the frame
+            ret, frame = temp_cap.read()
+            
+            # Release the temporary capture
+            temp_cap.release()
+            
+            if ret:
+                self.frame_cache[cache_key] = frame  # Cache the frame
+                return frame
+            else:
+                logger.error(f"Failed to read frame at timestamp {timestamp}s from {video_path}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error getting frame at timestamp {timestamp}s from {video_path}: {e}")
             return None
     
     def __enter__(self):

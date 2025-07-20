@@ -12,6 +12,64 @@ A comprehensive system for converting dance videos into pose time series data us
 - **CSV Export**: Export pose data with timestamps for synchronized playback
 - **🎭 Dance Recall System**: Real-time pose matching and video recall using live camera or video input
 
+## 🚀 Quick Start - Dance Recall System
+
+**Want to test the system quickly? Start here!**
+
+### 1. Install Dependencies
+```bash
+# Clone and setup
+git clone git@github.com:kinetecharts/dance-embedding.git
+cd dance_embedding
+
+# Create virtual environment with Python 3.9
+uv venv --python 3.9
+source .venv/bin/activate
+
+# Install dependencies
+uv pip install -e .
+```
+
+### 2. Extract Pose Data (One-time setup)
+```bash
+# Create data directories
+mkdir -p data/video data/poses
+
+# Add some dance videos to data/video/
+# Then extract poses from all videos
+python -m pose_extraction.main --input-dir data/video
+```
+
+### 3. Build LanceDB Database (One-time setup)
+```bash
+# Build the LanceDB vector database for fast pose matching
+python rebuild_database.py
+```
+
+### 4. Test with Live Camera
+```bash
+# Start real-time pose matching with camera
+python -m recall.main --mode camera --top-n 1 --match-interval 2.0 --playback-duration 3.0
+```
+
+### 4. Test with Video File
+```bash
+# Analyze a specific video file
+python -m recall.main --mode video --input data/video/your_video.mp4 --top-n 1 --match-interval 2.0
+```
+
+### What You'll See
+- **Left Window**: Live camera/video feed with red pose skeleton
+- **Right Window**: Matched reference video frame with green pose dots
+- **Overlay Info**: Match details (video name, timestamp, similarity score)
+- **Controls**: Press 'q' to quit, 'p' to pause, 'r' to reset
+
+### Performance Tips
+- Use `--top-n 1` for fastest matching
+- Use `--match-interval 2.0` or higher for better performance
+- Ensure good lighting for camera mode
+- Works best with 3-10 reference videos in database
+
 ## 🏗️ Architecture
 
 The system consists of four main components:
@@ -72,68 +130,7 @@ The system consists of four main components:
    python install.py
    ```
 
-## 🚀 Quick Start
-
-Get up and running in minutes with these simple steps:
-
-1. **Create the data directory structure**:
-   ```bash
-   mkdir -p data/video data/poses data/analysis/dimension_reduction
-   ```
-
-2. **Add a dance video file**:
-   ```bash
-   # Copy your dance video to the data/video folder
-   cp /path/to/your/dance_video.mp4 data/video/
-   ```
-
-3. **Extract pose data from the video**:
-   ```bash
-   # Process all videos in data/video (default)
-   python -m pose_extraction.main
- 
-   # or specify video
-   python -m pose_extraction.main --video data/video/dance_video.mp4
-   ```
-   This will create a CSV file with pose landmarks in `data/poses/` and an overlay video in `data/video_with_pose/` for review.
-
-4. **Run dimension reduction and create visualizations**:
-   ```bash
-   # Generate CSV data only (fastest)
-   python -m dimension_reduction.main --video data/video/dance_video.mp4 --pose-csv data/poses/dance_video.csv
-   
-   # Or create interactive HTML visualization
-   python -m dimension_reduction.main --video data/video/dance_video.mp4 --pose-csv data/poses/dance_video.csv --save-html
-   ```
-   This generates CSV files in `data/dimension_reduction/` for analysis.
-
-5. **Start the web application server**:
-   ```bash
-   cd src/viewer/webapp
-   python server.py
-   ```
-   Open your browser to [http://127.0.0.1:50680/](http://127.0.0.1:50680/) to view interactive visualizations with synchronized video playback.
-
-   ![Dance Motion Web Interface](images/web_interface.png "Interactive web interface showing synchronized video and pose visualization")
-
-### Automatic Processing with Monitor
-
-For automatic processing of new videos as they are added:
-
-```bash
-# Start the monitor script to watch for new videos
-python monitor_videos.py
-```
-
-This script will:
-- Watch the `data/video/` directory for new video files
-- Automatically run pose extraction when a new video is detected
-- Run dimension reduction for all methods (PCA, t-SNE, UMAP) on the extracted pose data
-- Process videos in the background while you continue working
-
-**Note:** The first time you run pose extraction (either manually or via monitor), it may take several minutes as MediaPipe downloads its AI models (~100MB). Subsequent runs will be much faster.
-
-## 🎭 Dance Recall System
+## 🎭 Dance Recall System - Detailed Guide
 
 The Dance Recall System enables real-time pose matching and video recall, allowing you to find similar dance movements from a database of pre-recorded videos while performing live or analyzing video files.
 
@@ -154,7 +151,13 @@ The Dance Recall System enables real-time pose matching and video recall, allowi
    python -m pose_extraction.main --input-dir data/video
    ```
 
-2. **Run with live camera**:
+2. **Build LanceDB database for fast matching**:
+   ```bash
+   # Create vector database for efficient pose matching
+   python rebuild_database.py
+   ```
+
+3. **Run with live camera**:
    ```bash
    # Start real-time pose matching with camera
    python -m recall.main --mode camera --top-n 3 --match-interval 1.0 --playback-duration 3.0
@@ -246,6 +249,141 @@ While the system is running:
 - Ensure camera permissions are granted
 - Try a different camera if available
 - Check camera is not being used by another application
+
+### LanceDB Database Management
+
+The Dance Recall System uses LanceDB for efficient vector similarity search. The database stores pose embeddings for fast matching.
+
+#### Building the Database
+
+**Initial Setup**:
+```bash
+# Extract poses from videos first
+python -m pose_extraction.main --input-dir data/video
+
+# Build LanceDB database
+python rebuild_database.py
+```
+
+**Rebuilding the Database**:
+```bash
+# Rebuild database (clears existing data)
+python rebuild_database.py
+```
+
+**Custom Database Path**:
+```python
+from recall.pose_embedding import create_pose_database
+
+# Create database with custom path
+database = create_pose_database(
+    pose_dir="data/poses",
+    video_dir="data/video", 
+    db_path="data/custom_database.lancedb"
+)
+```
+
+#### Database Information
+
+The LanceDB database contains:
+- **32-dimensional pose embeddings** for efficient similarity search
+- **Video metadata** (filename, timestamp, frame number)
+- **Pose landmarks** and confidence scores
+- **Indexed vectors** for fast L2 and cosine similarity search
+
+#### Database Files
+
+- **Location**: `data/pose_database.lancedb/` (excluded from git)
+- **Size**: ~10-50MB per 1000 poses (depends on video count)
+- **Format**: LanceDB vector database with embedded metadata
+
+#### Performance
+
+- **Search Speed**: ~1-5ms per query (vs 100-500ms for CSV search)
+- **Memory Usage**: ~100-500MB for typical dance video collections
+- **Scalability**: Supports 10,000+ poses efficiently
+
+#### Troubleshooting Database Issues
+
+**Database not found**:
+```bash
+# Rebuild database
+python rebuild_database.py
+```
+
+**Poor search performance**:
+```bash
+# Check database stats
+python -c "from recall.pose_embedding import LanceDBPoseDatabase; db = LanceDBPoseDatabase(); print(db.get_database_stats())"
+```
+
+**Database corruption**:
+```bash
+# Remove and rebuild
+rm -rf data/pose_database.lancedb
+python rebuild_database.py
+```
+
+## 🚀 Quick Start - Full System
+
+Get up and running in minutes with these simple steps:
+
+1. **Create the data directory structure**:
+   ```bash
+   mkdir -p data/video data/poses data/analysis/dimension_reduction
+   ```
+
+2. **Add a dance video file**:
+   ```bash
+   # Copy your dance video to the data/video folder
+   cp /path/to/your/dance_video.mp4 data/video/
+   ```
+
+3. **Extract pose data from the video**:
+   ```bash
+   # Process all videos in data/video (default)
+   python -m pose_extraction.main
+ 
+   # or specify video
+   python -m pose_extraction.main --video data/video/dance_video.mp4
+   ```
+   This will create a CSV file with pose landmarks in `data/poses/` and an overlay video in `data/video_with_pose/` for review.
+
+4. **Run dimension reduction and create visualizations**:
+   ```bash
+   # Generate CSV data only (fastest)
+   python -m dimension_reduction.main --video data/video/dance_video.mp4 --pose-csv data/poses/dance_video.csv
+   
+   # Or create interactive HTML visualization
+   python -m dimension_reduction.main --video data/video/dance_video.mp4 --pose-csv data/poses/dance_video.csv --save-html
+   ```
+   This generates CSV files in `data/dimension_reduction/` for analysis.
+
+5. **Start the web application server**:
+   ```bash
+   cd src/viewer/webapp
+   python server.py
+   ```
+   Open your browser to [http://127.0.0.1:50680/](http://127.0.0.1:50680/) to view interactive visualizations with synchronized video playback.
+
+   ![Dance Motion Web Interface](images/web_interface.png "Interactive web interface showing synchronized video and pose visualization")
+
+### Automatic Processing with Monitor
+
+For automatic processing of new videos as they are added:
+
+```bash
+# Start the monitor script to watch for new videos
+python monitor_videos.py
+```
+
+This script will:
+- Watch the `data/video/` directory for new video files
+- Automatically run pose extraction when a new video is detected
+- Run dimension reduction for all methods (PCA, t-SNE, UMAP) on the extracted pose data
+- Process videos in the background while you continue working
+
+**Note:** The first time you run pose extraction (either manually or via monitor), it may take several minutes as MediaPipe downloads its AI models (~100MB). Subsequent runs will be much faster.
 
 ### Data Requirements
 

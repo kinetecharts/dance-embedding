@@ -10,7 +10,7 @@ import cv2
 from .config import RecallConfig
 from .data_structures import PoseData, Match
 from .pose_tracker import PoseTracker
-from .pose_matcher import create_pose_matcher
+from .pose_matcher import PoseMatcher
 from .video_player import create_video_player
 
 logger = logging.getLogger(__name__)
@@ -26,7 +26,7 @@ class RecallSystem:
         
         # Initialize components
         self.pose_tracker = PoseTracker(config)
-        self.pose_matcher = create_pose_matcher(config, use_cache=True)
+        self.pose_matcher = PoseMatcher(config.__dict__)  # Convert config to dict
         self.video_player = create_video_player(config, with_controls=True)
         
         # State tracking
@@ -42,11 +42,11 @@ class RecallSystem:
         self.last_fps_time = 0
         self.current_fps = 0.0
         
-        logger.info("Recall system initialized with dual-window display")
+        logger.info("Recall system initialized with LanceDB-based pose matching")
     
     def run_live(self):
         """Main live processing loop with dual-window display"""
-        logger.info("Starting live camera mode with dual-window display")
+        logger.info("Starting live camera mode with LanceDB pose matching")
         
         # Start camera
         if not self.pose_tracker.start_camera():
@@ -92,7 +92,10 @@ class RecallSystem:
                 pose_data, frame = result
                 if pose_data is None:
                     # No pose detected, still show frame
-                    self.video_player.display_live_frame(frame)
+                    key = self.video_player.display_live_frame(frame)
+                    if key == ord('q'):
+                        logger.info("Q pressed - quitting")
+                        break
                     continue
                 
                 self.current_pose = pose_data
@@ -107,7 +110,12 @@ class RecallSystem:
                 
                 # Display live frame with current match info
                 current_match = self.video_player.current_match
-                self.video_player.display_live_frame(frame, pose_data, current_match)
+                key = self.video_player.display_live_frame(frame, pose_data, current_match)
+                
+                # Handle key press
+                if key == ord('q'):
+                    logger.info("Q pressed - quitting")
+                    break
                 
                 # Update FPS
                 self._update_fps()
@@ -127,7 +135,7 @@ class RecallSystem:
     
     def run_video(self, video_path: str, max_frames: Optional[int] = None):
         """Process video file input with dual-window display"""
-        logger.info(f"Starting video mode with dual-window display: {video_path}")
+        logger.info(f"Starting video mode with LanceDB pose matching: {video_path}")
         
         # Start video
         if not self.pose_tracker.start_video(video_path):
@@ -159,7 +167,10 @@ class RecallSystem:
                 pose_data, frame = result
                 if pose_data is None:
                     # No pose detected, still show frame
-                    self.video_player.display_live_frame(frame)
+                    key = self.video_player.display_live_frame(frame)
+                    if key == ord('q'):
+                        logger.info("Q pressed - quitting")
+                        break
                     continue
                 
                 self.current_pose = pose_data
@@ -173,7 +184,12 @@ class RecallSystem:
                 
                 # Display live frame with current match info
                 current_match = self.video_player.current_match
-                self.video_player.display_live_frame(frame, pose_data, current_match)
+                key = self.video_player.display_live_frame(frame, pose_data, current_match)
+                
+                # Handle key press
+                if key == ord('q'):
+                    logger.info("Q pressed - quitting")
+                    break
                 
                 # Update FPS
                 self._update_fps()
@@ -194,44 +210,42 @@ class RecallSystem:
     def _perform_matching(self, pose: PoseData):
         """Perform pose matching and video playback"""
         try:
-            # Find matches
+            # Find matches using LanceDB
             matches = self.pose_matcher.find_matches(pose, self.config.top_n)
             
             if not matches:
                 logger.warning("No matches found")
                 return
             
-            logger.info(f"Found {len(matches)} matches before randomization")
-            for i, match in enumerate(matches[:3]):  # Show top 3
-                video_name = Path(match.video_file).stem
-                logger.info(f"  Top match {i+1}: {video_name} at {match.timestamp:.2f}s (score: {match.similarity_score:.3f})")
+            # Log match details
+            logger.info(f"Found {len(matches)} matches:")
+            for i, match in enumerate(matches):
+                logger.info(f"  {i+1}. {match.video_file} at {match.timestamp:.2f}s (score: {match.similarity_score:.3f})")
             
-            # Randomly select from top matches
-            selected_matches = self.pose_matcher.random_select(matches, 1)  # Play one match at a time
-            self.current_matches = selected_matches
-            
-            # Store in history
-            self.matches_history.append(selected_matches)
-            
-            # Play matched video
-            for match in selected_matches:
-                self.video_player.play_match(match)
-                # Display matched pose in separate window
-                self.video_player.display_matched_pose(match, pose)
-            
-            # Log matches to terminal
-            logger.info(f"🎯 Selected {len(selected_matches)} matches:")
-            for i, match in enumerate(selected_matches):
-                video_name = Path(match.video_file).stem
-                logger.info(f"  Selected match {i+1}: {video_name} at {match.timestamp:.2f}s (score: {match.similarity_score:.3f})")
+            # Select a match (for now, just take the best one)
+            selected_match = self.pose_matcher.select_random_match(matches)
+            if selected_match:
+                logger.info(f"Selected match: {selected_match.video_file} at {selected_match.timestamp:.2f}s")
+                
+                # Start video playback for the match
+                self.video_player.play_match(selected_match)
+                
+                # Store in history
+                self.current_matches = matches
+                self.matches_history.append(matches)
+                
+                # Log performance stats
+                stats = self.pose_matcher.get_performance_stats()
+                if "avg_match_time" in stats:
+                    logger.info(f"Match performance: {stats['avg_match_time']:.3f}s avg, {stats['total_matches']} total")
             
         except Exception as e:
-            logger.error(f"Error performing matching: {e}")
+            logger.error(f"Error in pose matching: {e}")
     
     def _update_fps(self):
-        """Update FPS calculation"""
-        current_time = time.time()
+        """Update FPS counter"""
         self.fps_counter += 1
+        current_time = time.time()
         
         if current_time - self.last_fps_time >= 1.0:
             self.current_fps = self.fps_counter / (current_time - self.last_fps_time)
@@ -239,67 +253,84 @@ class RecallSystem:
             self.last_fps_time = current_time
     
     def _show_metrics(self):
-        """Show real-time metrics in terminal"""
-        if self.frame_count % 60 == 0:  # Show every 60 frames (2 seconds at 30 FPS)
-            similarity_scores = [m.similarity_score for m in self.current_matches]
-            current_match = self.video_player.current_match
-            match_status = "Playing" if current_match else "Idle"
-            
-            logger.info(f"📊 Frame: {self.frame_count}, FPS: {self.current_fps:.1f}, "
-                       f"Status: {match_status}, "
-                       f"Matches: {len(self.current_matches)}, "
-                       f"Scores: {[f'{s:.3f}' for s in similarity_scores]}")
+        """Show real-time metrics"""
+        if self.frame_count % 30 == 0:  # Every 30 frames
+            elapsed = time.time() - self.start_time if self.start_time else 0
+            logger.info(f"Frame: {self.frame_count}, FPS: {self.current_fps:.1f}, Time: {elapsed:.1f}s")
     
     def _cleanup(self):
-        """Cleanup resources"""
-        logger.info("Cleaning up resources")
-        
+        """Clean up resources"""
+        logger.info("Cleaning up recall system...")
         self.running = False
-        self.pose_tracker.release()
-        self.video_player.stop_all()
         
-        # Log final statistics
-        if self.start_time:
-            total_time = time.time() - self.start_time
-            logger.info(f"📈 Processing complete: {self.frame_count} frames in {total_time:.2f}s")
-            logger.info(f"📈 Average FPS: {self.frame_count / total_time:.1f}")
-            logger.info(f"📈 Total matches: {len(self.matches_history)}")
+        if self.pose_tracker:
+            self.pose_tracker.release()
+        
+        if self.video_player:
+            self.video_player.cleanup()
+        
+        # Show final statistics
+        self._show_final_stats()
+        
+        logger.info("Recall system cleanup complete")
+    
+    def _show_final_stats(self):
+        """Show final performance statistics"""
+        elapsed = time.time() - self.start_time if self.start_time else 0
+        avg_fps = self.frame_count / elapsed if elapsed > 0 else 0
+        
+        logger.info("=" * 50)
+        logger.info("FINAL STATISTICS")
+        logger.info("=" * 50)
+        logger.info(f"Total frames processed: {self.frame_count}")
+        logger.info(f"Total time: {elapsed:.2f} seconds")
+        logger.info(f"Average FPS: {avg_fps:.2f}")
+        logger.info(f"Total matches found: {len(self.matches_history)}")
+        
+        # Show pose matcher stats
+        matcher_stats = self.pose_matcher.get_performance_stats()
+        if "avg_match_time" in matcher_stats:
+            logger.info(f"Average match time: {matcher_stats['avg_match_time']:.3f}s")
+            logger.info(f"Total matches performed: {matcher_stats['total_matches']}")
+        
+        logger.info("=" * 50)
     
     def toggle_pause(self):
-        """Toggle pause/resume"""
+        """Toggle pause state"""
         self.paused = not self.paused
-        status = "PAUSED" if self.paused else "RUNNING"
-        logger.info(f"⏸️ System {status.lower()}")
+        status = "paused" if self.paused else "resumed"
+        logger.info(f"System {status}")
     
     def reset_players(self):
         """Reset video players"""
-        self.video_player.stop_all()
-        logger.info("🔄 Reset video players")
+        if self.video_player:
+            self.video_player.reset()
+        logger.info("Video players reset")
     
     def set_top_n(self, top_n: int):
         """Set top-N matches"""
-        if 1 <= top_n <= 9:
-            self.config.top_n = top_n
-            logger.info(f"🎯 Set top-N to {top_n}")
+        self.config.top_n = max(1, min(10, top_n))
+        logger.info(f"Top-N matches set to {self.config.top_n}")
     
     def quit(self):
         """Quit the system"""
-        logger.info("👋 Quitting system")
+        logger.info("Quitting recall system...")
         self.running = False
     
     def get_statistics(self) -> dict:
-        """Get system statistics"""
-        total_time = time.time() - self.start_time if self.start_time else 0
+        """Get current system statistics"""
+        elapsed = time.time() - self.start_time if self.start_time else 0
+        avg_fps = self.frame_count / elapsed if elapsed > 0 else 0
         
         return {
-            'frame_count': self.frame_count,
-            'total_time': total_time,
-            'average_fps': self.frame_count / total_time if total_time > 0 else 0,
-            'current_fps': self.current_fps,
-            'total_matches': len(self.matches_history),
-            'current_matches': len(self.current_matches),
-            'playing_videos': len(self.video_player.get_playing_videos()),
-            'paused': self.paused
+            "frame_count": self.frame_count,
+            "elapsed_time": elapsed,
+            "current_fps": self.current_fps,
+            "average_fps": avg_fps,
+            "total_matches": len(self.matches_history),
+            "current_pose": self.current_pose is not None,
+            "paused": self.paused,
+            "matcher_stats": self.pose_matcher.get_performance_stats()
         }
     
     def get_match_history(self) -> List[List[Match]]:
@@ -309,7 +340,7 @@ class RecallSystem:
     def clear_history(self):
         """Clear match history"""
         self.matches_history.clear()
-        logger.info("🗑️ Cleared match history")
+        logger.info("Match history cleared")
     
     def __enter__(self):
         """Context manager entry"""
@@ -325,41 +356,37 @@ class RecallSystemWithKeyboard(RecallSystem):
     
     def __init__(self, config: RecallConfig):
         super().__init__(config)
-        self.keyboard_thread = None
         self._setup_keyboard_controls()
     
     def _setup_keyboard_controls(self):
-        """Setup keyboard controls in a separate thread"""
+        """Setup keyboard controls"""
         def keyboard_listener():
-            try:
-                import keyboard
-                
-                def on_key_press(event):
-                    if event.name == 'space':
-                        self.toggle_pause()
-                    elif event.name == 'r':
-                        self.reset_players()
-                    elif event.name in '123456789':
-                        top_n = int(event.name)
-                        self.set_top_n(top_n)
-                    elif event.name == 'q':
-                        self.quit()
-                
-                keyboard.on_press(on_key_press)
-                keyboard.wait('q')  # Wait for quit key
-                
-            except ImportError:
-                logger.warning("keyboard module not available, keyboard controls disabled")
-            except Exception as e:
-                logger.error(f"Error setting up keyboard controls: {e}")
+            import keyboard
+            
+            def on_key_press(event):
+                if event.name == 'q':
+                    logger.info("Q pressed - quitting")
+                    self.quit()
+                elif event.name == 'p':
+                    logger.info("P pressed - toggling pause")
+                    self.toggle_pause()
+                elif event.name == 'r':
+                    logger.info("R pressed - resetting players")
+                    self.reset_players()
+                elif event.name in ['1', '2', '3', '4', '5', '6', '7', '8', '9']:
+                    top_n = int(event.name)
+                    logger.info(f"{top_n} pressed - setting top-N to {top_n}")
+                    self.set_top_n(top_n)
+            
+            keyboard.on_press(on_key_press)
         
-        self.keyboard_thread = threading.Thread(target=keyboard_listener, daemon=True)
-        self.keyboard_thread.start()
-        logger.info("⌨️ Keyboard controls enabled: Space=Pause, R=Reset, 1-9=Top-N, Q=Quit")
+        # Start keyboard listener in background thread
+        keyboard_thread = threading.Thread(target=keyboard_listener, daemon=True)
+        keyboard_thread.start()
 
 
 def create_recall_system(config: RecallConfig, with_keyboard: bool = True) -> RecallSystem:
-    """Create recall system with optional keyboard controls"""
+    """Create a recall system instance"""
     if with_keyboard:
         return RecallSystemWithKeyboard(config)
     else:
