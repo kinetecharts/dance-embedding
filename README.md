@@ -10,14 +10,74 @@ A comprehensive system for converting dance videos into pose time series data us
 - **Visualization**: Interactive 3D visualizations using Plotly and Rerun
 - **Live Prediction**: Framework for predicting future movements during live tracking
 - **CSV Export**: Export pose data with timestamps for synchronized playback
+- **🎭 Dance Recall System**: Real-time pose matching and video recall using live camera or video input
+
+## 🚀 Quick Start - Dance Recall System
+
+**Want to test the system quickly? Start here!**
+
+### 1. Install Dependencies
+```bash
+# Clone and setup
+git clone git@github.com:kinetecharts/dance-embedding.git
+cd dance_embedding
+
+# Create virtual environment with Python 3.9
+uv venv --python 3.9
+source .venv/bin/activate
+
+# Install dependencies
+uv pip install -e .
+```
+
+### 2. Extract Pose Data (One-time setup)
+```bash
+# Create data directories
+mkdir -p data/video data/poses
+
+# Add some dance videos to data/video/
+# Then extract poses from all videos
+python -m pose_extraction.main --input-dir data/video
+```
+
+### 3. Build LanceDB Database (One-time setup)
+```bash
+# Build the LanceDB vector database for fast pose matching
+python rebuild_database.py
+```
+
+### 4. Test with Live Camera
+```bash
+# Start real-time pose matching with camera
+python -m recall.main --mode camera --top-n 1 --match-interval 2.0 --playback-duration 3.0
+```
+
+### 4. Test with Video File
+```bash
+# Analyze a specific video file
+python -m recall.main --mode video --input data/video/your_video.mp4 --top-n 1 --match-interval 2.0
+```
+
+### What You'll See
+- **Left Window**: Live camera/video feed with red pose skeleton
+- **Right Window**: Matched reference video frame with green pose dots
+- **Overlay Info**: Match details (video name, timestamp, similarity score)
+- **Controls**: Press 'q' to quit, 'p' to pause, 'r' to reset
+
+### Performance Tips
+- Use `--top-n 1` for fastest matching
+- Use `--match-interval 2.0` or higher for better performance
+- Ensure good lighting for camera mode
+- Works best with 3-10 reference videos in database
 
 ## 🏗️ Architecture
 
-The system consists of three main components:
+The system consists of four main components:
 
 1. **Pose Extraction** (`src/pose_extraction/`): Uses MediaPipe and Rerun to extract pose landmarks from videos
 2. **Dimension Reduction** (`src/dimension_reduction/`): Creates visualizations and interactive analysis
 3. **Embedding Generation** (planned): Will create vector embeddings using Transformer or LSTM models
+4. **🎭 Dance Recall System** (`src/recall/`): Real-time pose matching and video recall with live camera support
 
 ## 📦 Installation
 
@@ -70,7 +130,201 @@ The system consists of three main components:
    python install.py
    ```
 
-## 🚀 Quick Start
+## 🎭 Dance Recall System - Detailed Guide
+
+The Dance Recall System enables real-time pose matching and video recall, allowing you to find similar dance movements from a database of pre-recorded videos while performing live or analyzing video files.
+
+### Features
+
+- **Real-time Pose Matching**: Match live camera poses against a database of dance movements
+- **Video Input Support**: Analyze pre-recorded videos for pose matching
+- **Side-by-Side Display**: View live pose and matched reference pose simultaneously
+- **Multiple Video Support**: Match against multiple dance videos in the database
+- **Configurable Matching**: Adjust matching frequency, top-N results, and playback duration
+- **Performance Metrics**: Real-time FPS and match statistics
+
+### Quick Start with Dance Recall
+
+1. **Ensure you have pose data ready**:
+   ```bash
+   # Extract poses from your dance videos first
+   python -m pose_extraction.main --input-dir data/video
+   ```
+
+2. **Build LanceDB database for fast matching**:
+   ```bash
+   # Create vector database for efficient pose matching
+   python rebuild_database.py
+   ```
+
+3. **Run with live camera**:
+   ```bash
+   # Start real-time pose matching with camera
+   python -m recall.main --mode camera --top-n 3 --match-interval 1.0 --playback-duration 3.0
+   ```
+
+3. **Run with video file**:
+   ```bash
+   # Analyze a specific video file
+   python -m recall.main --mode video --input data/video/dance_video.mp4 --top-n 3 --match-interval 2.0 --playback-duration 3.0
+   ```
+
+### What You'll See
+
+When running the Dance Recall System, you'll see a window titled "Dance Recall System" with:
+
+- **Left Side**: Live camera feed or input video with red pose skeleton overlay
+- **Right Side**: Matched reference video frame with green pose dots overlay
+- **Overlay Information**: Match details including video name, timestamp, and similarity score
+
+### Command Line Options
+
+```bash
+python -m recall.main [OPTIONS]
+
+Options:
+  --mode {camera,video}          Input mode: camera or video file
+  --input PATH                   Input video file (required for video mode)
+  --top-n INTEGER               Number of top matches to consider (default: 3)
+  --match-interval FLOAT        Interval between matches in seconds (default: 2.0)
+  --playback-duration FLOAT     Duration to display each match (default: 3.0)
+  --pose-dir PATH               Directory containing pose CSV files (default: data/poses)
+  --video-dir PATH              Directory containing video files (default: data/video)
+```
+
+### Examples
+
+**Live Camera Mode**:
+```bash
+# Basic camera mode with default settings
+python -m recall.main --mode camera
+
+# Camera mode with custom settings
+python -m recall.main --mode camera --top-n 5 --match-interval 0.5 --playback-duration 5.0
+```
+
+**Video File Mode**:
+```bash
+# Analyze a specific video file
+python -m recall.main --mode video --input data/video/Dai2.mov
+
+# Analyze with custom settings
+python -m recall.main --mode video --input data/video/dance.mp4 --top-n 3 --match-interval 1.0
+```
+
+**Custom Data Directories**:
+```bash
+# Use custom pose and video directories
+python -m recall.main --mode camera --pose-dir /path/to/poses --video-dir /path/to/videos
+```
+
+### Controls
+
+While the system is running:
+- **Press 'q'**: Quit the application
+- **Press 'p'**: Pause/resume matching
+- **Press 'r'**: Reset match display
+- **Press '1-9'**: Select top-N matches (1-9)
+
+### Performance Tips
+
+1. **Optimize for Real-time**: Use `--match-interval 1.0` or higher for better performance
+2. **Reduce Top-N**: Use `--top-n 3` instead of higher values for faster matching
+3. **Camera Quality**: Ensure good lighting and clear camera view for better pose detection
+4. **Database Size**: The system works best with 3-10 reference videos in the database
+
+### Troubleshooting
+
+**No matches found**:
+- Ensure pose CSV files exist in `data/poses/`
+- Check that video files are in `data/video/`
+- Verify pose extraction was completed successfully
+
+**Poor performance**:
+- Reduce `--top-n` value
+- Increase `--match-interval`
+- Close other applications to free up CPU/GPU resources
+
+**Camera not working**:
+- Ensure camera permissions are granted
+- Try a different camera if available
+- Check camera is not being used by another application
+
+### LanceDB Database Management
+
+The Dance Recall System uses LanceDB for efficient vector similarity search. The database stores pose embeddings for fast matching.
+
+#### Building the Database
+
+**Initial Setup**:
+```bash
+# Extract poses from videos first
+python -m pose_extraction.main --input-dir data/video
+
+# Build LanceDB database
+python rebuild_database.py
+```
+
+**Rebuilding the Database**:
+```bash
+# Rebuild database (clears existing data)
+python rebuild_database.py
+```
+
+**Custom Database Path**:
+```python
+from recall.pose_embedding import create_pose_database
+
+# Create database with custom path
+database = create_pose_database(
+    pose_dir="data/poses",
+    video_dir="data/video", 
+    db_path="data/custom_database.lancedb"
+)
+```
+
+#### Database Information
+
+The LanceDB database contains:
+- **32-dimensional pose embeddings** for efficient similarity search
+- **Video metadata** (filename, timestamp, frame number)
+- **Pose landmarks** and confidence scores
+- **Indexed vectors** for fast L2 and cosine similarity search
+
+#### Database Files
+
+- **Location**: `data/pose_database.lancedb/` (excluded from git)
+- **Size**: ~10-50MB per 1000 poses (depends on video count)
+- **Format**: LanceDB vector database with embedded metadata
+
+#### Performance
+
+- **Search Speed**: ~1-5ms per query (vs 100-500ms for CSV search)
+- **Memory Usage**: ~100-500MB for typical dance video collections
+- **Scalability**: Supports 10,000+ poses efficiently
+
+#### Troubleshooting Database Issues
+
+**Database not found**:
+```bash
+# Rebuild database
+python rebuild_database.py
+```
+
+**Poor search performance**:
+```bash
+# Check database stats
+python -c "from recall.pose_embedding import LanceDBPoseDatabase; db = LanceDBPoseDatabase(); print(db.get_database_stats())"
+```
+
+**Database corruption**:
+```bash
+# Remove and rebuild
+rm -rf data/pose_database.lancedb
+python rebuild_database.py
+```
+
+## 🚀 Quick Start - Full System
 
 Get up and running in minutes with these simple steps:
 
@@ -130,6 +384,42 @@ This script will:
 - Process videos in the background while you continue working
 
 **Note:** The first time you run pose extraction (either manually or via monitor), it may take several minutes as MediaPipe downloads its AI models (~100MB). Subsequent runs will be much faster.
+
+### Data Requirements
+
+The Dance Recall System requires:
+
+1. **Pose CSV Files**: Extracted pose data in `data/poses/` directory
+2. **Video Files**: Original video files in `data/video/` directory
+3. **File Naming**: Pose CSV files should match video file names (e.g., `Dai2.csv` for `Dai2.mov`)
+
+### Advanced Usage
+
+**Custom Pose Matching**:
+```python
+from recall.pose_matcher import PoseMatcher
+from recall.config import RecallConfig
+
+# Initialize matcher
+config = RecallConfig()
+matcher = PoseMatcher(config)
+
+# Find matches for a pose
+matches = matcher.find_matches(pose_data, top_n=3)
+```
+
+**Video Player Integration**:
+```python
+from recall.video_player import VideoPlayer
+from recall.config import RecallConfig
+
+# Initialize video player
+config = RecallConfig()
+player = VideoPlayer(config)
+
+# Display matched pose
+player.display_live_frame(frame, pose_data, match_info)
+```
 
 ### Development Setup
 
@@ -194,6 +484,15 @@ motion_embedding/
 │   ├── main.py                  # Dimension reduction and visualization
 │   ├── visualizer.py            # Visualization tools
 │   └── reduction_methods.py     # Dimension reduction algorithms
+├── src/recall/
+│   ├── __init__.py              # Dance recall system package
+│   ├── main.py                  # Main recall system entry point
+│   ├── recall_system.py         # Core recall system logic
+│   ├── pose_matcher.py          # Pose matching algorithms
+│   ├── pose_normalizer.py       # Pose normalization utilities
+│   ├── video_player.py          # Video playback and display
+│   ├── data_structures.py       # Data classes and structures
+│   └── config.py                # Configuration management
 ├── src/viewer/
 │   └── webapp/                  # Web application for viewing results
 ├── data/

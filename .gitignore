@@ -102,7 +102,7 @@ ipython_config.py
 #poetry.lock
 
 # pdm
-#   Similar to Pipfile.lock, it is generally recommended to include pdm.lock in version control.
+#   Similar to Pipfile.lock, it is generally recommended to include pdm.pdm.lock in version control.
 #pdm.lock
 #   pdm stores project-wide configurations in .pdm.toml, but it is recommended to not include it
 #   in version control.
@@ -120,7 +120,6 @@ celerybeat.pid
 *.sage.py
 
 # Environments
-.env
 .env*
 .venv
 env/
@@ -164,6 +163,7 @@ cython_debug/
 
 # Project-specific
 data/
+data/dev/
 data/video/
 data/poses/
 data/embeddings/
@@ -177,6 +177,17 @@ data/dimension_reduction/
 *.pkl
 *.h5
 *.hdf5
+
+# LanceDB - Vector Database Files
+# LanceDB creates database directories and files that should not be tracked
+.lancedb/
+lancedb/
+*.lance
+*.lancedb
+data/lancedb/
+data/.lancedb/
+**/lancedb/
+**/.lancedb/
 
 # Images (allow screenshots and documentation images)
 !images/

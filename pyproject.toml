@@ -33,18 +33,15 @@ dependencies = [
     "numpy>=1.21.0",
     "pandas>=1.3.0",
     "opencv-python>=4.6.0",
-    
     # MediaPipe for pose estimation
     "mediapipe>=0.10.0",
-    
     # Rerun for visualization
     "rerun-sdk>=0.10.0",
-    
     # Utilities
     "pathlib2>=2.3.0; python_version < '3.4'",
-    
     # Monitoring
     "watchdog>=3.0.0",
+    "lancedb>=0.24.1",
 ]
 
 [project.optional-dependencies]
