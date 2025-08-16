@@ -10,7 +10,8 @@ readme = "README.md"
 requires-python = ">=3.9,<3.13"
 license = {text = "MIT"}
 authors = [
-    {name = "Your Name", email = "your.email@example.com"},
+    {name = "Weidong Yang", email = "weidong@kinetecharts.org"},
+    {name = "jason a. grafft", email = "jason@grafft.co"}
 ]
 keywords = ["dance", "motion", "pose-estimation", "mediapipe", "rerun"]
 classifiers = [
@@ -30,18 +31,29 @@ classifiers = [
 
 dependencies = [
     # Core dependencies
+    "dotenv>=0.9.9",
     "numpy>=1.21.0",
     "pandas>=1.3.0",
+    "polars>=0.49.1",
     "opencv-python>=4.6.0",
+    "scipy>=1.16.0",
+
+    # Altair for 2D visualization 
+    "altair>=5.5.0",
+    "pyarrow>=20.0.0",
+    "vl-convert-python>=1.8.0",
+    
     # MediaPipe for pose estimation
     "mediapipe>=0.10.0",
+    
     # Rerun for visualization
     "rerun-sdk>=0.10.0",
+    
     # Utilities
     "pathlib2>=2.3.0; python_version < '3.4'",
+    
     # Monitoring
     "watchdog>=3.0.0",
-    "lancedb>=0.24.1",
 ]
 
 [project.optional-dependencies]
