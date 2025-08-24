@@ -1,0 +1,75 @@
+{
+  "recall_system": {
+    "mode": "camera",
+    "input_video": null,
+    "top_n": 5,
+    "match_every": 60,
+    "match_interval": 2.0,
+    "match_playback_duration": 2.0,
+    "similarity_metric": "euclidean",
+    "confidence_threshold": 0.5,
+    "normalize_rotation": false,
+    "max_cache_size": 1000,
+    "parallel_workers": 4,
+    "video_player": "opencv"
+  },
+  "paths": {
+    "pose_dir": "data/poses",
+    "video_dir": "data/video",
+    "video_with_pose_dir": "data/video_with_pose"
+  },
+  "osc_streaming": {
+    "enabled": false,
+    "host": "127.0.0.1",
+    "port": 6448,
+    "stream_rate": 30.0,
+    "hand_joints_only": true,
+    "include_confidence": true,
+    "include_3d": true,
+    "left_hand_prefix": "/pose/left_hand",
+    "right_hand_prefix": "/pose/right_hand"
+  },
+  "video_matching": {
+    "load_specific_videos": false,
+    "specific_videos": [
+      "Jawa.MOV",
+      "Dai3.mp4",
+      "Francine.MOV"
+    ],
+    "video_extensions": [".mp4", ".avi", ".mov", ".mkv", ".webm"],
+    "exclude_patterns": [
+      "*_test.mp4",
+      "*_draft.mp4",
+      "temp_*"
+    ],
+    "include_patterns": [
+      "*_final.mp4",
+      "*_performance.mp4"
+    ]
+  },
+  "joint_weights": {
+    "nose": 1.0,
+    "left_eye": 0.8,
+    "right_eye": 0.8,
+    "left_ear": 0.8,
+    "right_ear": 0.8,
+    "left_shoulder": 1.2,
+    "right_shoulder": 1.2,
+    "left_elbow": 1.0,
+    "right_elbow": 1.0,
+    "left_wrist": 0.8,
+    "right_wrist": 0.8,
+    "left_hip": 1.2,
+    "right_hip": 1.2,
+    "left_knee": 1.0,
+    "right_knee": 1.0,
+    "left_ankle": 0.8,
+    "right_ankle": 0.8
+  },
+  "performance": {
+    "enable_caching": true,
+    "cache_cleanup_interval": 300,
+    "max_memory_usage_mb": 1024,
+    "enable_profiling": false
+  }
+}

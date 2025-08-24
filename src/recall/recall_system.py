@@ -13,6 +13,7 @@ from .pose_tracker import PoseTracker
 from .pose_matcher import PoseMatcher
 from .video_player import create_video_player
 from .osc_streamer import create_osc_streamer
+from .json_config_loader import create_config_loader
 
 logger = logging.getLogger(__name__)
 
@@ -25,10 +26,23 @@ class RecallSystem:
         self.running = True
         self.paused = False
         
+        # Initialize JSON config loader for video file selection
+        self.config_loader = create_config_loader()
+        logger.info("✅ JSON config loader initialized")
+        
+        # Get filtered video files for matching
+        self.target_video_files = self.config_loader.get_video_files_for_matching(config.video_dir)
+        logger.info(f"Target videos for matching: {[f.stem for f in self.target_video_files]}")
+        
         # Initialize components
         self.pose_tracker = PoseTracker(config)
-        self.pose_matcher = PoseMatcher(config.__dict__)  # Convert config to dict
-        self.video_player = create_video_player(config, with_controls=True)
+        
+        # Create pose matcher with target video filtering
+        target_video_names = [f.name for f in self.target_video_files] if self.target_video_files else None
+        self.pose_matcher = PoseMatcher(config.__dict__, target_videos=target_video_names)
+        
+        # Create video player with target video information
+        self.video_player = create_video_player(config, with_controls=True, target_videos=self.target_video_files)
         
         # Initialize OSC streamer if enabled
         self.osc_streamer = None
@@ -366,6 +380,20 @@ class RecallSystem:
         """Clear match history"""
         self.matches_history.clear()
         logger.info("Match history cleared")
+    
+    def get_video_files_for_matching(self) -> List[Path]:
+        """Get filtered video files for matching based on JSON config"""
+        if hasattr(self, 'config_loader') and self.config_loader:
+            return self.config_loader.get_video_files_for_matching(self.config.video_dir)
+        else:
+            # Fallback to default behavior
+            return self.config.get_video_files()
+    
+    def get_config_summary(self) -> str:
+        """Get configuration summary"""
+        if hasattr(self, 'config_loader') and self.config_loader:
+            return self.config_loader.get_config_summary()
+        return "JSON config loader not available"
     
     def __enter__(self):
         """Context manager entry"""

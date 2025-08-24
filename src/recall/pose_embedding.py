@@ -275,13 +275,14 @@ class LanceDBPoseDatabase:
         logger.info(f"Total poses loaded: {total_poses}")
         return total_poses
     
-    def find_similar_poses(self, query_pose: PoseData, top_k: int = 5) -> List[Dict[str, Any]]:
+    def find_similar_poses(self, query_pose: PoseData, top_k: int = 5, target_videos: Optional[List[str]] = None) -> List[Dict[str, Any]]:
         """
         Find similar poses using cosine similarity
         
         Args:
             query_pose: Pose to find matches for
             top_k: Number of top matches to return
+            target_videos: Optional list of video file names to filter results (e.g., ["Dai3.mp4", "Francine.MOV"])
             
         Returns:
             List of match dictionaries with similarity scores
@@ -304,7 +305,7 @@ class LanceDBPoseDatabase:
                 
                 if results.empty or results["_distance"].isna().all():
                     logger.warning("LanceDB cosine search also failed, falling back to manual computation")
-                    return self._find_similar_poses_manual(query_embedding, top_k)
+                    return self._find_similar_poses_manual(query_embedding, top_k, target_videos)
             
             # Convert distances to similarity scores and filter out NaN results
             matches = []
@@ -312,6 +313,12 @@ class LanceDBPoseDatabase:
                 distance = row["_distance"]
                 if pd.isna(distance):
                     continue
+                
+                # Filter by target videos if specified
+                video_file = row["video_file"]
+                if target_videos is not None:
+                    if video_file not in target_videos:
+                        continue
                 
                 # For L2 distance, convert to similarity (lower distance = higher similarity)
                 # Normalize L2 distance to [0,1] range and invert
@@ -322,7 +329,7 @@ class LanceDBPoseDatabase:
                     similarity_score = 0.0
                 
                 match = {
-                    "video_file": row["video_file"],
+                    "video_file": video_file,
                     "timestamp": row["timestamp"],
                     "frame_number": row["frame_number"],
                     "pose_index": row["pose_index"],
@@ -337,9 +344,9 @@ class LanceDBPoseDatabase:
             
         except Exception as e:
             logger.error(f"LanceDB search failed: {e}, falling back to manual computation")
-            return self._find_similar_poses_manual(query_embedding, top_k)
+            return self._find_similar_poses_manual(query_embedding, top_k, target_videos)
     
-    def _find_similar_poses_manual(self, query_embedding: np.ndarray, top_k: int = 5) -> List[Dict[str, Any]]:
+    def _find_similar_poses_manual(self, query_embedding: np.ndarray, top_k: int = 5, target_videos: Optional[List[str]] = None) -> List[Dict[str, Any]]:
         """
         Manual fallback for finding similar poses when LanceDB fails
         """
@@ -352,13 +359,20 @@ class LanceDBPoseDatabase:
         # Compute similarities manually
         similarities = []
         for _, row in all_poses.iterrows():
+            video_file = row["video_file"]
+            
+            # Filter by target videos if specified
+            if target_videos is not None:
+                if video_file not in target_videos:
+                    continue
+            
             db_embedding = np.array(row["embedding"])
             
             # Compute cosine similarity
             cosine_sim = np.dot(query_embedding, db_embedding) / (np.linalg.norm(query_embedding) * np.linalg.norm(db_embedding))
             
             similarities.append({
-                "video_file": row["video_file"],
+                "video_file": video_file,
                 "timestamp": row["timestamp"],
                 "frame_number": row["frame_number"],
                 "pose_index": row["pose_index"],

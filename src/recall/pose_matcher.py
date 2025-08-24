@@ -18,9 +18,10 @@ logger = logging.getLogger(__name__)
 class LanceDBPoseMatcher:
     """Pose matcher using LanceDB for efficient similarity search"""
     
-    def __init__(self, database: LanceDBPoseDatabase, config: Dict[str, Any]):
+    def __init__(self, database: LanceDBPoseDatabase, config: Dict[str, Any], target_videos: Optional[List[str]] = None):
         self.database = database
         self.config = config
+        self.target_videos = target_videos
         self.embedding_generator = PoseEmbeddingGenerator()
         
         # Create a default config for the normalizer
@@ -46,8 +47,8 @@ class LanceDBPoseMatcher:
         start_time = time.time()
         
         try:
-            # Use LanceDB to find similar poses
-            matches = self.database.find_similar_poses(pose_data, top_k=top_n)
+            # Use LanceDB to find similar poses with video filtering
+            matches = self.database.find_similar_poses(pose_data, top_k=top_n, target_videos=self.target_videos)
             
             # Convert to Match objects
             match_objects = []
@@ -122,8 +123,9 @@ class LanceDBPoseMatcher:
 class PoseMatcher:
     """Legacy pose matcher - kept for backward compatibility"""
     
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Dict[str, Any], target_videos: Optional[List[str]] = None):
         self.config = config
+        self.target_videos = target_videos
         
         # Create a default config for the normalizer
         from .config import RecallConfig
@@ -155,7 +157,7 @@ class PoseMatcher:
                 logger.info("Loading existing LanceDB pose database...")
                 database = LanceDBPoseDatabase(db_path)
             
-            self.lancedb_matcher = LanceDBPoseMatcher(database, self.config)
+            self.lancedb_matcher = LanceDBPoseMatcher(database, self.config, self.target_videos)
             
             # Print database stats
             stats = database.get_database_stats()

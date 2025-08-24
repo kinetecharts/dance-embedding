@@ -27,22 +27,54 @@ class VideoPlayer:
         self.running = True
         self.current_match = None
         self.match_start_time = None
+        self.target_video_stems = []  # Initialize empty target videos list
         
-        # Pre-load all pose data for better performance
-        self._preload_all_poses()
+        # Don't preload poses here - wait until target_video_stems is set
     
     def _preload_all_poses(self):
         """Pre-load all pose data to avoid repeated CSV loading"""
         logger.info("Pre-loading all pose data for better performance...")
         pose_dir = Path(self.config.pose_dir)
         
-        for csv_file in pose_dir.glob("*.csv"):
-            video_stem = csv_file.stem
-            poses = self._load_poses_from_csv(csv_file)
-            self.pose_cache[video_stem] = poses
-            logger.info(f"Pre-loaded {len(poses)} poses for {video_stem}")
+        # Get the list of videos we actually want to use for matching
+        target_videos = self._get_target_video_stems()
+        
+        if target_videos:
+            logger.info(f"Pre-loading poses for {len(target_videos)} target videos: {target_videos}")
+            for csv_file in pose_dir.glob("*.csv"):
+                video_stem = csv_file.stem
+                # Only load poses for videos we want to use
+                if video_stem in target_videos:
+                    poses = self._load_poses_from_csv(csv_file)
+                    self.pose_cache[video_stem] = poses
+                    logger.info(f"Pre-loaded {len(poses)} poses for {video_stem}")
+                else:
+                    logger.debug(f"Skipping poses for {video_stem} (not in target videos)")
+        else:
+            # Fallback: load all poses if no target videos specified
+            logger.info("No target videos specified, loading all pose data...")
+            for csv_file in pose_dir.glob("*.csv"):
+                video_stem = csv_file.stem
+                poses = self._load_poses_from_csv(csv_file)
+                self.pose_cache[video_stem] = poses
+                logger.info(f"Pre-loaded {len(poses)} poses for {video_stem}")
         
         logger.info(f"Pre-loaded pose data for {len(self.pose_cache)} videos")
+    
+    def _get_target_video_stems(self) -> List[str]:
+        """Get the list of video stems we want to use for matching"""
+        try:
+            # Check if target_video_stems was set during creation
+            if hasattr(self, 'target_video_stems') and self.target_video_stems:
+                return self.target_video_stems
+            
+            # Fallback: try to get from config if available
+            if hasattr(self, 'config') and hasattr(self.config, 'video_dir'):
+                return []
+            return []
+        except Exception as e:
+            logger.debug(f"Could not determine target videos: {e}")
+            return []
     
     def play_match(self, match: Match):
         """Start playback for a match with synchronized dual-window display"""
@@ -642,9 +674,19 @@ class VideoPlayerWithControls(VideoPlayer):
         logger.info(f"Set loop mode for {Path(video_path).name}: {loop}")
 
 
-def create_video_player(config: RecallConfig, with_controls: bool = False) -> VideoPlayer:
-    """Create video player with optional control features"""
+def create_video_player(config: RecallConfig, with_controls: bool = False, target_videos: Optional[List[Path]] = None) -> VideoPlayer:
+    """Create video player with optional control features and target video filtering"""
     if with_controls:
-        return VideoPlayerWithControls(config)
+        player = VideoPlayerWithControls(config)
     else:
-        return VideoPlayer(config) 
+        player = VideoPlayer(config)
+    
+    # Set target videos if provided
+    if target_videos is not None:
+        player.target_video_stems = [v.stem for v in target_videos]
+        logger.info(f"Video player configured with target videos: {player.target_video_stems}")
+    
+    # Now preload poses with the target videos set
+    player._preload_all_poses()
+    
+    return player 
