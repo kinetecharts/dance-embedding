@@ -12,6 +12,7 @@ from .data_structures import PoseData, Match
 from .pose_tracker import PoseTracker
 from .pose_matcher import PoseMatcher
 from .video_player import create_video_player
+from .osc_streamer import create_osc_streamer
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,17 @@ class RecallSystem:
         self.pose_tracker = PoseTracker(config)
         self.pose_matcher = PoseMatcher(config.__dict__)  # Convert config to dict
         self.video_player = create_video_player(config, with_controls=True)
+        
+        # Initialize OSC streamer if enabled
+        self.osc_streamer = None
+        if config.osc_enabled:
+            self.osc_streamer = create_osc_streamer(
+                host=config.osc_host,
+                port=config.osc_port,
+                stream_rate=config.osc_stream_rate,
+                enabled=config.osc_enabled
+            )
+            logger.info(f"✅ OSC streaming enabled: {config.osc_host}:{config.osc_port}")
         
         # State tracking
         self.current_pose = None
@@ -100,6 +112,10 @@ class RecallSystem:
                 
                 self.current_pose = pose_data
                 self.frame_count += 1
+                
+                # Stream pose data via OSC if enabled
+                if self.osc_streamer:
+                    self.osc_streamer.stream_pose(pose_data)
                 
                 # Check if it's time to match (every 2 seconds)
                 current_time = time.time()
@@ -175,6 +191,10 @@ class RecallSystem:
                 
                 self.current_pose = pose_data
                 self.frame_count += 1
+                
+                # Stream pose data via OSC if enabled
+                if self.osc_streamer:
+                    self.osc_streamer.stream_pose(pose_data)
                 
                 # Check if it's time to match (every 2 seconds)
                 current_time = time.time()
@@ -268,6 +288,11 @@ class RecallSystem:
         
         if self.video_player:
             self.video_player.cleanup()
+        
+        # Clean up OSC streamer
+        if self.osc_streamer:
+            self.osc_streamer.close()
+            logger.info("OSC streamer closed")
         
         # Show final statistics
         self._show_final_stats()

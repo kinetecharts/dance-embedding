@@ -38,21 +38,18 @@ dependencies = [
     "polars>=0.49.1",
     "opencv-python>=4.6.0",
     "scipy>=1.7.0,<1.12.0",
-
-    # Altair for 2D visualization 
+    # Altair for 2D visualization
     "altair>=5.5.0",
     "pyarrow>=20.0.0",
     "vl-convert-python>=1.8.0",
-    
     # MediaPipe for pose estimation
     "mediapipe>=0.10.0",
-    
     # Rerun for visualization
     "rerun-sdk>=0.10.0",
-    
     # Utilities
     "pathlib2>=2.3.0; python_version < '3.4'",
-    
+    # OSC streaming
+    "python-osc>=1.8.0",
     # Monitoring
     "watchdog>=3.0.0",
 ]
