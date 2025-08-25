@@ -14,7 +14,7 @@ from recall.advanced_osc_streamer import create_advanced_osc_streamer
 from recall.data_structures import PoseData
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+logging.basicConfig(level=logging.DEBUG, format='%(levelname)s: %(message)s')
 logger = logging.getLogger(__name__)
 
 
@@ -25,10 +25,19 @@ def create_test_pose_data(frame_number: int, time_offset: float = 0.0) -> PoseDa
     landmarks = np.zeros((33, 3))
     
     # Set body landmarks (shoulders, hips, etc.)
-    # Left shoulder (11)
-    landmarks[11] = [0.4, 0.3, 0.5]
-    # Right shoulder (12) 
-    landmarks[12] = [0.6, 0.3, 0.5]
+    # Simulate different body orientations based on frame number
+    if frame_number < 50:
+        # Frame 0-49: Facing camera (shoulders horizontal)
+        landmarks[11] = [0.4, 0.3, 0.4]  # Left shoulder
+        landmarks[12] = [0.6, 0.3, 0.4]  # Right shoulder
+    elif frame_number < 100:
+        # Frame 50-99: Turned slightly right (shoulders at angle)
+        landmarks[11] = [0.4, 0.3, 0.3]  # Left shoulder (closer)
+        landmarks[12] = [0.6, 0.3, 0.5]  # Right shoulder (farther)
+    else:
+        # Frame 100+: Turned slightly left (shoulders at angle)
+        landmarks[11] = [0.4, 0.3, 0.5]  # Left shoulder (farther)
+        landmarks[12] = [0.6, 0.3, 0.3]  # Right shoulder (closer)
     # Left hip (23)
     landmarks[23] = [0.4, 0.7, 0.5]
     # Right hip (24)
@@ -106,7 +115,7 @@ def test_advanced_osc_streaming():
         if client:
             stream_config = test_config["streams"][stream_name]
             logger.info(f"   {stream_name}: {stream_config['host']}:{stream_config['port']} -> {stream_config['address']}")
-            logger.info(f"   Data: 15 values in single message")
+            logger.info(f"   Data: 21 values in single message")
     
     # Test streaming
     logger.info("\n🎭 Starting pose streaming test...")

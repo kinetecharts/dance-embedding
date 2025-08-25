@@ -596,40 +596,50 @@ The system implements a **single-stream OSC system** with **body-relative coordi
 
 **Address**: `/pose/data`
 
-**Data Array (15 values):**
+**Data Array (21 values):**
 ```
-/pose/data [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+/pose/data [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
 ```
 
 **Value Breakdown:**
 - **Values 1-3**: Left hand X, Y, Z (body-relative, normalized by torso length)
 - **Values 4-6**: Right hand X, Y, Z (body-relative, normalized by torso length)
-- **Values 7-8**: Torso rotation Yaw, Pitch (degrees)
-- **Values 9-10**: Head rotation Yaw, Pitch (relative to torso, degrees)
-- **Values 11-13**: Torso position X, Y, Z (frame coordinates, 0.0-1.0)
-- **Value 14**: Velocity magnitude (Z-filtered, fast rise, slow decay)
-- **Value 15**: Acceleration magnitude (Z-filtered, fast rise, slow decay)
+- **Values 7-9**: Left foot X, Y, Z (body-relative, normalized by torso length)
+- **Values 10-12**: Right foot X, Y, Z (body-relative, normalized by torso length)
+- **Values 13-14**: Torso rotation Yaw, Pitch (degrees)
+- **Values 15-16**: Head rotation Yaw, Pitch (relative to torso, degrees)
+- **Values 17-19**: Torso position X, Y, Z (frame coordinates, 0.0-1.0)
+- **Value 20**: Velocity magnitude (Z-filtered, fast rise, slow decay)
+- **Value 21**: Acceleration magnitude (Z-filtered, fast rise, slow decay)
 
 #### **4. Data Specifications**
 
-**Hand Positions (Values 1-6)**
+**Hand and Foot Positions (Values 1-12)**
 - **Scale**: Normalized by torso length (1.0 = one torso length)
 - **Origin**: Chest center point
-- **Content**: Hand center position only (no finger details)
+- **Content**: Hand and foot center positions only (no finger/toe details)
 - **Units**: Body-relative coordinates
+- **Values 1-3**: Left hand X, Y, Z
+- **Values 4-6**: Right hand X, Y, Z
+- **Values 7-9**: Left foot X, Y, Z
+- **Values 10-12**: Right foot X, Y, Z
 
-**Rotation Data (Values 7-10)**
-- **Torso Rotation**: Absolute rotation in frame coordinates
+**Rotation Data (Values 13-16)**
+- **Torso Rotation**: 
+  - **Yaw**: 0° when facing camera, positive when turning right, negative when turning left
+  - **Pitch**: 0° when level, positive when leaning forward, negative when leaning back
 - **Head Rotation**: Relative to torso orientation
+  - **Yaw**: 0° when aligned with body, positive when turning right relative to body, negative when turning left relative to body
+  - **Pitch**: 0° when level with body, positive when nodding up, negative when nodding down
 - **Units**: Degrees (-180° to +180°)
 
-**Torso Position (Values 11-13)**
+**Torso Position (Values 17-19)**
 - **Frame Coordinates**: 0.0 to 1.0 relative to camera frame
 - **Purpose**: Absolute positioning in the scene
 
-**Movement Analysis (Values 14-15)**
-- **Velocity**: Overall movement magnitude with Z-filter
-- **Acceleration**: Movement change rate with Z-filter
+**Movement Analysis (Values 20-21)**
+- **Velocity**: Overall movement magnitude with Z-filter (hands + feet)
+- **Acceleration**: Movement change rate with Z-filter (hands + feet)
 - **Z-Filter**: Fast rise (0.8-0.9), slow decay (0.95-0.98)
 
 ### Coordinate System Implementation
@@ -649,14 +659,16 @@ The system implements a **single-stream OSC system** with **body-relative coordi
 
 **Single Stream Format:**
 ```
-/pose/data [0.5, -0.3, 0.2, 0.8, -0.1, 0.4, 15.2, -5.8, -10.5, 8.2, 0.5, 0.4, 0.6, 0.15, 0.25]
+/pose/data [0.5, -0.3, 0.2, 0.8, -0.1, 0.4, -0.2, 0.6, 0.1, -0.1, 0.7, 0.0, 15.2, -5.8, -10.5, 8.2, 0.5, 0.4, 0.6, 0.15, 0.25]
 ```
 
 **Value Breakdown:**
 - **Values 1-3**: Left hand [0.5, -0.3, 0.2] = right, down, forward from chest
-- **Values 4-6**: Right hand [0.8, -0.1, 0.4] = right, down, forward from chest  
-- **Values 7-8**: Torso rotation [15.2, -5.8] = turning right, leaning forward
-- **Values 9-10**: Head rotation [-10.5, 8.2] = turning left, nodding up (relative to torso)
+- **Values 4-6**: Right hand [0.8, -0.1, 0.4] = right, down, forward from chest
+- **Values 7-9**: Left foot [-0.2, 0.6, 0.1] = left, up, forward from chest
+- **Values 10-12**: Right foot [-0.1, 0.7, 0.0] = left, up, at chest level
+- **Values 13-14**: Torso rotation [15.2, -5.8] = turning right, leaning forward
+- **Values 15-16**: Head rotation [-10.5, 8.2] = turning left, nodding up (relative to torso)
 - **Values 11-13**: Torso position [0.5, 0.4, 0.6] = center, upper, forward in frame
 - **Value 14**: Velocity magnitude 0.15 (Z-filtered movement)
 - **Value 15**: Acceleration magnitude 0.25 (Z-filtered acceleration)

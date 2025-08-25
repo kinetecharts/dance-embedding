@@ -80,6 +80,8 @@ class AdvancedOSCStreamer:
         # Previous pose data for velocity/acceleration calculations
         self.previous_hand_positions = {'left': None, 'right': None}
         self.previous_hand_velocities = {'left': None, 'right': None}
+        self.previous_foot_positions = {'left_foot': None, 'right_foot': None}
+        self.previous_foot_positions_2 = {'left_foot': None, 'right_foot': None}  # For acceleration calculation
         
         # Initialize clients and filters
         self._initialize_clients()
@@ -163,18 +165,31 @@ class AdvancedOSCStreamer:
         left_shoulder = pose_data.landmarks[11]
         right_shoulder = pose_data.landmarks[12]
         
-        # Calculate shoulder vector
+        # Calculate shoulder vector (right to left)
         shoulder_vector = right_shoulder - left_shoulder
         
-        # Yaw (left-right rotation) - angle in XZ plane
-        yaw = math.atan2(shoulder_vector[2], shoulder_vector[0])
+        # For yaw: when person faces camera, shoulders should be horizontal
+        # We want 0° when facing camera, positive when turning right, negative when turning left
+        # Use the X component (left-right) and Z component (forward-backward)
+        yaw = math.atan2(shoulder_vector[0], shoulder_vector[2])
         
-        # Pitch (forward-backward tilt) - angle in YZ plane
-        pitch = math.atan2(shoulder_vector[1], shoulder_vector[2])
+        # Rotate coordinate system 90° so front = 0°
+        yaw += math.pi/2
         
-        # Convert to degrees and normalize to -180 to 180
+        # For pitch: when person faces camera, shoulders should be level
+        # We want 0° when level, positive when leaning forward, negative when leaning back
+        # Use the Y component (up-down) and Z component (forward-backward)
+        pitch = math.atan2(shoulder_vector[1], abs(shoulder_vector[2]))
+        
+        # Convert to degrees
         yaw_deg = math.degrees(yaw)
         pitch_deg = math.degrees(pitch)
+        
+        # Normalize yaw to -180 to 180 range
+        while yaw_deg > 180:
+            yaw_deg -= 360
+        while yaw_deg < -180:
+            yaw_deg += 360
         
         return (yaw_deg, pitch_deg)
     
@@ -193,11 +208,17 @@ class AdvancedOSCStreamer:
         head_direction = nose - head_center
         
         # Yaw relative to body (head turning left/right)
+        # When head is aligned with body, this should be 0°
         head_yaw = math.atan2(head_direction[0], head_direction[2])
         head_yaw_deg = math.degrees(head_yaw) - body_yaw
         
+        # Rotate head coordinate system 180° so front = 0°
+        head_yaw_deg += 180
+        
         # Pitch (head nodding up/down)
-        head_pitch = math.atan2(head_direction[1], head_direction[2])
+        # When head is level with body, this should be 0°
+        # Use abs(head_direction[2]) to avoid division by zero issues
+        head_pitch = math.atan2(head_direction[1], abs(head_direction[2]))
         head_pitch_deg = math.degrees(head_pitch)
         
         # Normalize yaw to -180 to 180
@@ -302,10 +323,12 @@ class AdvancedOSCStreamer:
         body_scale = self._calculate_body_scale(pose_data)
         chest_center = self._get_chest_center(pose_data)
         body_yaw, body_pitch = self._calculate_body_orientation(pose_data)
+        
+        # Calculate head rotation using body yaw
         head_yaw, head_pitch = self._calculate_head_rotation(pose_data, body_yaw)
         
         logger.debug(f"Body scale: {body_scale}, Chest center: {chest_center}")
-        logger.debug(f"Body orientation: yaw={body_yaw:.2f}, pitch={body_pitch:.2f}")
+        logger.debug(f"Body yaw: {body_yaw:.2f}°, Body pitch: {body_pitch:.2f}°")
         
         # Single stream: pack all data into one OSC message
         if 'pose_data' in self.config.streams and self.config.streams['pose_data'].enabled:
@@ -314,13 +337,19 @@ class AdvancedOSCStreamer:
                 left_wrist = pose_data.landmarks[15]
                 right_wrist = pose_data.landmarks[16]
                 
+                # Get foot positions (relative to chest, normalized by body scale)
+                left_ankle = pose_data.landmarks[27]
+                right_ankle = pose_data.landmarks[28]
+                
                 left_hand_pos = (left_wrist - chest_center) / body_scale
                 right_hand_pos = (right_wrist - chest_center) / body_scale
+                left_foot_pos = (left_ankle - chest_center) / body_scale
+                right_foot_pos = (right_ankle - chest_center) / body_scale
                 
                 # Get torso position in frame coordinates
                 torso_pos = chest_center
                 
-                # Calculate movement and acceleration
+                # Calculate movement and acceleration (now including feet)
                 movements = self._calculate_hand_movement(pose_data)
                 accelerations = self._calculate_hand_acceleration(pose_data)
                 
@@ -329,41 +358,80 @@ class AdvancedOSCStreamer:
                 acceleration_magnitude = 0.0
                 
                 if 'pose_data' in self.z_filters:
-                    # Use velocity filter for overall movement
+                    # Use velocity filter for overall movement (hands + feet)
                     left_movement = movements.get('left', 0.0)
                     right_movement = movements.get('right', 0.0)
-                    total_movement = left_movement + right_movement
+                    # Add foot movement to total
+                    left_foot_movement = np.linalg.norm(left_ankle - self._get_previous_position('left_foot'))
+                    right_foot_movement = np.linalg.norm(right_ankle - self._get_previous_position('right_foot'))
+                    total_movement = left_movement + right_movement + left_foot_movement + right_foot_movement
                     velocity_magnitude = self.z_filters['pose_data'].update(total_movement)
                     
-                    # Use acceleration filter for overall acceleration
+                    # Use acceleration filter for overall acceleration (hands + feet)
                     left_accel = accelerations.get('left', 0.0)
                     right_accel = accelerations.get('right', 0.0)
-                    total_acceleration = left_accel + right_accel
+                    # Add foot acceleration to total
+                    left_foot_accel = np.linalg.norm(left_ankle - 2 * self._get_previous_position('left_foot') + self._get_previous_position('left_foot', 2))
+                    right_foot_accel = np.linalg.norm(right_ankle - 2 * self._get_previous_position('right_foot') + self._get_previous_position('right_foot', 2))
+                    total_acceleration = left_accel + right_accel + left_foot_accel + right_foot_accel
                     acceleration_magnitude = self.z_filters['pose_data'].update(total_acceleration)
                 
-                # Pack all 15 values into single OSC message
-                # [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]
+                # Pack all 21 values into single OSC message
+                # [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21]
                 # 1-3: left hand x,y,z (body-relative)
                 # 4-6: right hand x,y,z (body-relative)
-                # 7-8: torso rotation yaw,pitch (degrees)
-                # 9-10: head rotation yaw,pitch (relative to torso, degrees)
-                # 11-13: torso position x,y,z (frame coordinates)
-                # 14: velocity magnitude (Z-filtered)
-                # 15: acceleration magnitude (Z-filtered)
+                # 7-9: left foot x,y,z (body-relative)
+                # 10-12: right foot x,y,z (body-relative)
+                # 13-14: torso rotation yaw,pitch (degrees)
+                # 15-16: head rotation yaw,pitch (relative to torso, degrees)
+                # 17-19: torso position x,y,z (frame coordinates)
+                # 20: velocity magnitude (Z-filtered)
+                # 21: acceleration magnitude (Z-filtered)
                 
                 osc_data = [
                     left_hand_pos[0], left_hand_pos[1], left_hand_pos[2],      # 1-3: left hand
                     right_hand_pos[0], right_hand_pos[1], right_hand_pos[2],   # 4-6: right hand
-                    body_yaw, body_pitch,                                      # 7-8: torso rotation
-                    head_yaw, head_pitch,                                      # 9-10: head rotation
-                    torso_pos[0], torso_pos[1], torso_pos[2],                  # 11-13: torso position
-                    velocity_magnitude,                                        # 14: velocity
-                    acceleration_magnitude                                     # 15: acceleration
+                    left_foot_pos[0], left_foot_pos[1], left_foot_pos[2],      # 7-9: left foot
+                    right_foot_pos[0], right_foot_pos[1], right_foot_pos[2],   # 10-12: right foot
+                    body_yaw, body_pitch,                                      # 13-14: torso rotation
+                    head_yaw, head_pitch,                                      # 15-16: head rotation
+                    torso_pos[0], torso_pos[1], torso_pos[2],                  # 17-19: torso position
+                    velocity_magnitude,                                        # 20: velocity
+                    acceleration_magnitude                                     # 21: acceleration
                 ]
                 
                 stream_config = self.config.streams['pose_data']
-                logger.debug(f"Sending OSC message to {stream_config.address}: {osc_data}")
+                logger.debug(f"Sending OSC message to {stream_config.address}: {len(osc_data)} values")
                 self._send_osc_message('pose_data', stream_config.address, *osc_data)
+                
+                # Update previous positions for next frame
+                self._update_previous_positions(left_ankle, right_ankle)
+    
+    def _get_previous_position(self, limb: str, frames_back: int = 1) -> np.ndarray:
+        """Get previous position for a limb (for velocity/acceleration calculations)"""
+        if frames_back == 1:
+            if limb in self.previous_foot_positions:
+                return self.previous_foot_positions[limb] if self.previous_foot_positions[limb] is not None else np.array([0.0, 0.0, 0.0])
+            else:
+                return self.previous_hand_positions[limb] if self.previous_hand_positions[limb] is not None else np.array([0.0, 0.0, 0.0])
+        elif frames_back == 2:
+            if limb in self.previous_foot_positions_2:
+                return self.previous_foot_positions_2[limb] if self.previous_foot_positions_2[limb] is not None else np.array([0.0, 0.0, 0.0])
+            else:
+                return self.previous_hand_positions[limb] if self.previous_hand_positions[limb] is not None else np.array([0.0, 0.0, 0.0])
+        return np.array([0.0, 0.0, 0.0])
+    
+    def _update_previous_positions(self, left_ankle: np.ndarray, right_ankle: np.ndarray):
+        """Update previous positions for feet (shift back by 2 frames for acceleration)"""
+        # Shift positions back by 2 frames for acceleration calculation
+        if self.previous_foot_positions['left_foot'] is not None:
+            self.previous_foot_positions_2['left_foot'] = self.previous_foot_positions['left_foot'].copy()
+        if self.previous_foot_positions['right_foot'] is not None:
+            self.previous_foot_positions_2['right_foot'] = self.previous_foot_positions['right_foot'].copy()
+        
+        # Update current positions
+        self.previous_foot_positions['left_foot'] = left_ankle.copy()
+        self.previous_foot_positions['right_foot'] = right_ankle.copy()
     
     def close(self):
         """Close all OSC clients"""

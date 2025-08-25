@@ -1,87 +1,110 @@
-# OSC Streaming for Hand Joints
+# Advanced OSC Streaming for Pose Data
 
-This module provides OSC (Open Sound Control) streaming capabilities for pose landmarks, specifically focused on hand joint data from MediaPipe pose estimation.
+This module provides advanced OSC (Open Sound Control) streaming capabilities for comprehensive pose data, including hands, feet, body orientation, and movement analysis from MediaPipe pose estimation.
 
 ## Overview
 
-The OSC streaming system allows you to stream hand joint positions in real-time to other applications that can receive OSC messages. This is useful for:
+The advanced OSC streaming system allows you to stream comprehensive pose data in real-time to other applications that can receive OSC messages. This includes hands, feet, body orientation, and movement analysis. This is useful for:
 
 - Interactive installations
 - Real-time music/audio applications
 - Motion-controlled systems
+- Dance and movement analysis
 - Cross-platform communication between different software
 
 ## Features
 
-- **Hand-focused streaming**: Streams only hand joint data (left and right hands)
+- **Comprehensive pose streaming**: Streams hands, feet, body orientation, and movement data
+- **Body-relative coordinates**: Normalized by torso length for consistent measurements
+- **Location-independent**: Same pose produces same values regardless of camera distance
+- **Z-filtered movement**: Fast rise, slow decay filtering for velocity and acceleration
 - **Configurable rate**: Adjustable streaming frequency (default: 30 Hz)
 - **3D coordinates**: Supports both 2D and 3D coordinate systems
-- **Confidence scores**: Optional inclusion of MediaPipe confidence values
 - **UDP transport**: Uses UDP for low-latency communication
 
 ## OSC Message Format
 
-### Address Patterns
+### Single Stream Architecture
 
-Hand joint data is streamed using the following OSC address patterns:
+The system streams a single OSC message containing **21 values** packed into one stream:
 
-- **Left Hand**: `/pose/left_hand/{joint_name}`
-- **Right Hand**: `/pose/right_hand/{joint_name}`
+**OSC Address:** `/pose/data`  
+**Port:** 6448 (configurable)  
+**Data Format:** Single message with 21 float values
 
-### Joint Names
+### Data Breakdown (21 values):
 
-The following hand joints are streamed:
+1. **Left Hand X, Y, Z** (body-relative, normalized by torso length)
+2. **Right Hand X, Y, Z** (body-relative, normalized by torso length)  
+3. **Left Foot X, Y, Z** (body-relative, normalized by torso length)
+4. **Right Foot X, Y, Z** (body-relative, normalized by torso length)
+5. **Torso Rotation Yaw, Pitch** (degrees)
+6. **Head Rotation Yaw, Pitch** (relative to torso, degrees)
+7. **Torso Position X, Y, Z** (frame coordinates, 0.0-1.0)
+8. **Velocity Magnitude** (Z-filtered, fast rise, slow decay)
+9. **Acceleration Magnitude** (Z-filtered, fast rise, slow decay)
 
-- `wrist` - Wrist position
-- `thumb_tip`, `thumb_ip`, `thumb_mcp`, `thumb_cmc` - Thumb joints
-- `index_tip`, `index_dip`, `index_pip`, `index_mcp` - Index finger joints
-- `middle_tip`, `middle_dip`, `middle_pip`, `middle_mcp` - Middle finger joints
-- `ring_tip`, `ring_dip`, `ring_pip`, `ring_mcp` - Ring finger joints
-- `pinky_tip`, `pinky_dip`, `pinky_pip`, `pinky_mcp` - Pinky finger joints
+### Example OSC Message:
+```
+/pose/data 0.5 -0.2 1.2 0.6 0.1 1.1 -0.3 0.8 0.0 -0.2 0.9 0.1 -45.2 12.8 -2.1 15.3 0.48 0.52 0.1 0.8 0.6
+```
 
-### Message Arguments
+### Coordinate System
 
-Each OSC message contains:
+**Body-Relative Coordinates (Values 1-12):**
+- **Origin**: Chest center point (midpoint between shoulders and hips)
+- **Scale**: Normalized by torso length (1.0 = one torso length)
+- **Benefits**: Same pose produces same values regardless of distance from camera
 
-1. **X coordinate** (float): Horizontal position (0.0 = left, 1.0 = right)
-2. **Y coordinate** (float): Vertical position (0.0 = top, 1.0 = bottom)
-3. **Z coordinate** (float): Depth position (if 3D enabled)
-4. **Confidence** (float): MediaPipe confidence score (0.0-1.0, if enabled)
+**Frame-Relative Coordinates (Values 17-19):**
+- **X-axis**: 0.0 (left) to 1.0 (right)
+- **Y-axis**: 0.0 (top) to 1.0 (bottom)
+- **Z-axis**: 0.0 (closer) to 1.0 (farther)
+
+**Rotation Data (Values 13-16):**
+- **Torso Rotation**: 
+  - **Yaw**: 0° when facing camera, positive when turning right, negative when turning left
+  - **Pitch**: 0° when level, positive when leaning forward, negative when leaning back
+- **Head Rotation**: Relative to torso orientation
+  - **Yaw**: 0° when aligned with body, positive when turning right relative to body, negative when turning left relative to body
+  - **Pitch**: 0° when level with body, positive when nodding up, negative when nodding down
+- **Units**: Degrees (-180° to +180°)
 
 ## Configuration
 
-### Basic Configuration
+### JSON Configuration
 
-```python
-from recall.config import RecallConfig
+The OSC streaming is configured through `config.json`:
 
-config = RecallConfig(
-    # Enable OSC streaming
-    osc_enabled=True,
-    osc_host="127.0.0.1",      # Target host
-    osc_port=6448,              # Target port
-    osc_stream_rate=30.0,       # Hz
-    osc_hand_joints_only=True   # Only stream hands
-)
+```json
+{
+  "osc_streaming": {
+    "enabled": true,
+    "stream_rate": 30.0,
+    "streams": {
+      "pose_data": {
+        "enabled": true,
+        "host": "127.0.0.1",
+        "port": 6448,
+        "address": "/pose/data",
+        "z_filter": {
+          "velocity_fast_rise": 0.8,
+          "velocity_slow_decay": 0.95,
+          "acceleration_fast_rise": 0.9,
+          "acceleration_slow_decay": 0.98
+        }
+      }
+    }
+  }
+}
 ```
 
-### Advanced Configuration
+### Z-Filter Parameters
 
-```python
-from recall.osc_streamer import OSCConfig
-
-osc_config = OSCConfig(
-    host="192.168.1.100",       # Remote host
-    port=9000,                  # Custom port
-    enabled=True,
-    stream_rate=60.0,           # 60 Hz streaming
-    hand_joints_only=True,
-    include_confidence=True,     # Include confidence scores
-    include_3d=True,            # Include 3D coordinates
-    left_hand_prefix="/hands/left",    # Custom address prefix
-    right_hand_prefix="/hands/right"   # Custom address prefix
-)
-```
+- **velocity_fast_rise**: How quickly velocity responds to increases (0.8 = fast)
+- **velocity_slow_decay**: How slowly velocity decreases (0.95 = slow)
+- **acceleration_fast_rise**: How quickly acceleration responds to changes (0.9 = fast)
+- **acceleration_slow_decay**: How slowly acceleration decreases (0.98 = slow)
 
 ## Usage Examples
 
@@ -93,10 +116,11 @@ from recall.config import RecallConfig
 
 # Create config with OSC enabled
 config = RecallConfig(
-    osc_enabled=True,
-    osc_host="127.0.0.1",
-    osc_port=8000
+    osc_enabled=True
 )
+
+# The system will automatically load OSC configuration from config.json
+```
 
 # Run system with OSC streaming
 with create_recall_system(config) as system:
