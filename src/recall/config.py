@@ -24,12 +24,8 @@ class RecallConfig:
     parallel_workers: int = 4
     video_player: str = "opencv"  # "opencv", "vlc", "mpv"
     
-    # OSC streaming configuration
+    # OSC streaming configuration (now handled by JSON config)
     osc_enabled: bool = False
-    osc_host: str = "127.0.0.1"
-    osc_port: int = 6448
-    osc_stream_rate: float = 30.0  # Hz
-    osc_hand_joints_only: bool = True
     
     # Joint weights for weighted similarity
     joint_weights: Optional[Dict[str, float]] = field(default_factory=lambda: {

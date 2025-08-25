@@ -12,7 +12,7 @@ from .data_structures import PoseData, Match
 from .pose_tracker import PoseTracker
 from .pose_matcher import PoseMatcher
 from .video_player import create_video_player
-from .osc_streamer import create_osc_streamer
+from .advanced_osc_streamer import create_advanced_osc_streamer
 from .json_config_loader import create_config_loader
 
 logger = logging.getLogger(__name__)
@@ -44,16 +44,16 @@ class RecallSystem:
         # Create video player with target video information
         self.video_player = create_video_player(config, with_controls=True, target_videos=self.target_video_files)
         
-        # Initialize OSC streamer if enabled
+        # Initialize advanced OSC streamer if enabled
         self.osc_streamer = None
         if config.osc_enabled:
-            self.osc_streamer = create_osc_streamer(
-                host=config.osc_host,
-                port=config.osc_port,
-                stream_rate=config.osc_stream_rate,
-                enabled=config.osc_enabled
-            )
-            logger.info(f"✅ OSC streaming enabled: {config.osc_host}:{config.osc_port}")
+            # Get OSC configuration from JSON config loader
+            osc_config = self.config_loader.config_data.get("osc_streaming", {})
+            self.osc_streamer = create_advanced_osc_streamer(osc_config)
+            if self.osc_streamer:
+                logger.info("✅ Advanced OSC streaming enabled with multiple streams")
+            else:
+                logger.warning("⚠️ OSC streaming configuration invalid or disabled")
         
         # State tracking
         self.current_pose = None
@@ -129,7 +129,10 @@ class RecallSystem:
                 
                 # Stream pose data via OSC if enabled
                 if self.osc_streamer:
+                    logger.debug("Calling OSC streamer with pose data")
                     self.osc_streamer.stream_pose(pose_data)
+                else:
+                    logger.debug("No OSC streamer available")
                 
                 # Check if it's time to match (every 2 seconds)
                 current_time = time.time()
@@ -208,7 +211,10 @@ class RecallSystem:
                 
                 # Stream pose data via OSC if enabled
                 if self.osc_streamer:
+                    logger.debug("Calling OSC streamer with pose data")
                     self.osc_streamer.stream_pose(pose_data)
+                else:
+                    logger.debug("No OSC streamer available")
                 
                 # Check if it's time to match (every 2 seconds)
                 current_time = time.time()

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Example of enabling OSC streaming in the recall system for hand joints."""
+"""Example of enabling OSC streaming in the recall system with single-stream data."""
 # to run: uv run examples/osc_streaming_example.py
-# address: /pose/left_hand/wrist
+# address: /pose/data [15 values]
 
 import logging
 from pathlib import Path
@@ -14,7 +14,7 @@ from recall.config import RecallConfig
 from recall.recall_system import create_recall_system
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 
@@ -28,20 +28,14 @@ def main():
         match_interval=2.0,  # Match every 2 seconds
         match_playback_duration=2.0,  # Play matches for 2 seconds
         
-        # Enable OSC streaming
-        osc_enabled=True,
-        osc_host="127.0.0.1",  # Localhost
-        osc_port=6448,          # Port 6448 Wekinator default port
-        # osc_port=1234,          # Isadora default port
-        osc_stream_rate=15.0,   # 30 Hz streaming
-        osc_hand_joints_only=False  # Only stream hand joints
+        # Enable OSC streaming (configuration now handled by JSON config)
+        osc_enabled=True
     )
     
-    logger.info(f"OSC streaming configured: {config.osc_host}:{config.osc_port}")
-    logger.info(f"Streaming rate: {config.osc_stream_rate} Hz")
-    logger.info("Hand joints will be streamed to:")
-    logger.info("  - /pose/left_hand/* (left hand landmarks)")
-    logger.info("  - /pose/right_hand/* (right hand landmarks)")
+    logger.info("OSC streaming enabled - configuration loaded from config.json")
+    logger.info("Single stream will be sent to:")
+    logger.info("  - /pose/data [15 values] - all pose data in one message")
+    logger.info("  - Port 6448 - single port for all data")
     
     # Create and run recall system
     with create_recall_system(config, with_keyboard=True) as system:

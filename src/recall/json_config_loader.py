@@ -128,12 +128,8 @@ class JSONConfigLoader:
             parallel_workers=recall_config.get("parallel_workers", 4),
             video_player=recall_config.get("video_player", "opencv"),
             
-            # OSC configuration
-            osc_enabled=osc_config.get("enabled", False),
-            osc_host=osc_config.get("host", "127.0.0.1"),
-            osc_port=osc_config.get("port", 6448),
-            osc_stream_rate=osc_config.get("stream_rate", 30.0),
-            osc_hand_joints_only=osc_config.get("hand_joints_only", True)
+            # OSC configuration (now handled by advanced streamer)
+            osc_enabled=osc_config.get("enabled", False)
         )
         
         # Override joint weights if specified in JSON

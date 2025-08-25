@@ -11,6 +11,7 @@ A comprehensive system for converting dance videos into pose time series data us
 - **Live Prediction**: Framework for predicting future movements during live tracking
 - **CSV Export**: Export pose data with timestamps for synchronized playback
 - **🎭 Dance Recall System**: Real-time pose matching and video recall using live camera or video input
+- **📡 OSC Streaming**: Real-time pose data streaming via Open Sound Control protocol
 
 ## 🚀 Quick Start - Dance Recall System
 
@@ -556,6 +557,121 @@ python -m pose_extraction.main --video data/video/dance.mp4 --use-rerun
 - **UMAP**: Uniform Manifold Approximation and Projection (default)
 - **t-SNE**: t-Distributed Stochastic Neighbor Embedding
 - **PCA**: Principal Component Analysis
+
+### Advanced OSC Streaming Specification
+
+The system implements a **single-stream OSC system** with **body-relative coordinates** for consistent scale and **Z-filters** for movement analysis:
+
+#### **1. Coordinate System Requirements**
+- **Body-Relative Scale**: Use torso length as stable reference for consistent measurements
+- **Chest-Center Origin**: All hand positions relative to chest center point
+- **Distance Independent**: Same gesture produces same values at different distances from camera
+- **Person Independent**: Works with different body sizes
+
+#### **2. Single Stream Architecture**
+```json
+{
+  "osc_streaming": {
+    "enabled": true,
+    "stream_rate": 30.0,
+    "streams": {
+      "pose_data": {
+        "enabled": true,
+        "host": "127.0.0.1",
+        "port": 6448,
+        "address": "/pose/data",
+        "z_filter": {
+          "velocity_fast_rise": 0.8,
+          "velocity_slow_decay": 0.95,
+          "acceleration_fast_rise": 0.9,
+          "acceleration_slow_decay": 0.98
+        }
+      }
+    }
+  }
+}
+```
+
+#### **3. Single OSC Message Format**
+
+**Address**: `/pose/data`
+
+**Data Array (15 values):**
+```
+/pose/data [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+```
+
+**Value Breakdown:**
+- **Values 1-3**: Left hand X, Y, Z (body-relative, normalized by torso length)
+- **Values 4-6**: Right hand X, Y, Z (body-relative, normalized by torso length)
+- **Values 7-8**: Torso rotation Yaw, Pitch (degrees)
+- **Values 9-10**: Head rotation Yaw, Pitch (relative to torso, degrees)
+- **Values 11-13**: Torso position X, Y, Z (frame coordinates, 0.0-1.0)
+- **Value 14**: Velocity magnitude (Z-filtered, fast rise, slow decay)
+- **Value 15**: Acceleration magnitude (Z-filtered, fast rise, slow decay)
+
+#### **4. Data Specifications**
+
+**Hand Positions (Values 1-6)**
+- **Scale**: Normalized by torso length (1.0 = one torso length)
+- **Origin**: Chest center point
+- **Content**: Hand center position only (no finger details)
+- **Units**: Body-relative coordinates
+
+**Rotation Data (Values 7-10)**
+- **Torso Rotation**: Absolute rotation in frame coordinates
+- **Head Rotation**: Relative to torso orientation
+- **Units**: Degrees (-180° to +180°)
+
+**Torso Position (Values 11-13)**
+- **Frame Coordinates**: 0.0 to 1.0 relative to camera frame
+- **Purpose**: Absolute positioning in the scene
+
+**Movement Analysis (Values 14-15)**
+- **Velocity**: Overall movement magnitude with Z-filter
+- **Acceleration**: Movement change rate with Z-filter
+- **Z-Filter**: Fast rise (0.8-0.9), slow decay (0.95-0.98)
+
+### Coordinate System Implementation
+
+**Primary System: Body-Relative Coordinates**
+- **Origin**: Chest center (midpoint between shoulders and hips)
+- **Scale**: Normalized by torso length for consistent measurements
+- **Units**: Relative to body size (1.0 = one torso length)
+- **Benefits**: Same gesture produces same values regardless of distance from camera
+
+**Legacy Support: Frame-Relative Coordinates**
+- **X-axis (horizontal)**: **0.0 to 1.0** (left to right)
+- **Y-axis (vertical)**: **0.0 to 1.0** (top to bottom) 
+- **Z-axis (depth)**: **0.0 to 1.0** (closer to camera = smaller values)
+
+**Example OSC Message:**
+
+**Single Stream Format:**
+```
+/pose/data [0.5, -0.3, 0.2, 0.8, -0.1, 0.4, 15.2, -5.8, -10.5, 8.2, 0.5, 0.4, 0.6, 0.15, 0.25]
+```
+
+**Value Breakdown:**
+- **Values 1-3**: Left hand [0.5, -0.3, 0.2] = right, down, forward from chest
+- **Values 4-6**: Right hand [0.8, -0.1, 0.4] = right, down, forward from chest  
+- **Values 7-8**: Torso rotation [15.2, -5.8] = turning right, leaning forward
+- **Values 9-10**: Head rotation [-10.5, 8.2] = turning left, nodding up (relative to torso)
+- **Values 11-13**: Torso position [0.5, 0.4, 0.6] = center, upper, forward in frame
+- **Value 14**: Velocity magnitude 0.15 (Z-filtered movement)
+- **Value 15**: Acceleration magnitude 0.25 (Z-filtered acceleration)
+
+**Coordinate System:**
+- **Hands (1-6)**: Body-relative, normalized by torso length
+- **Rotations (7-10)**: Degrees (-180° to +180°)
+- **Torso Position (11-13)**: Frame coordinates (0.0-1.0)
+- **Movement (14-15)**: Z-filtered magnitude values
+
+**Why Body-Relative Coordinates?**
+- **Distance Independent**: Same gesture gives same values at any distance
+- **Person Independent**: Works with different body sizes
+- **Gesture Recognition**: Consistent values for machine learning applications
+- **Performance Tracking**: Stable measurements for movement analysis
 
 ## 📈 Performance
 

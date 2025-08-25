@@ -19,15 +19,22 @@
     "video_with_pose_dir": "data/video_with_pose"
   },
   "osc_streaming": {
-    "enabled": false,
-    "host": "127.0.0.1",
-    "port": 6448,
+    "enabled": true,
     "stream_rate": 30.0,
-    "hand_joints_only": true,
-    "include_confidence": true,
-    "include_3d": true,
-    "left_hand_prefix": "/pose/left_hand",
-    "right_hand_prefix": "/pose/right_hand"
+    "streams": {
+      "pose_data": {
+        "enabled": true,
+        "host": "127.0.0.1",
+        "port": 6448,
+        "address": "/pose/data",
+        "z_filter": {
+          "velocity_fast_rise": 0.8,
+          "velocity_slow_decay": 0.95,
+          "acceleration_fast_rise": 0.9,
+          "acceleration_slow_decay": 0.98
+        }
+      }
+    }
   },
   "video_matching": {
     "load_specific_videos": false,
