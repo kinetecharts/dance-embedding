@@ -33,6 +33,18 @@
           "acceleration_fast_rise": 0.9,
           "acceleration_slow_decay": 0.98
         }
+      },
+      "pose_data_duplicate": {
+        "enabled": true,
+        "host": "127.0.0.1",
+        "port": 1234,
+        "address": "/pose/data",
+        "z_filter": {
+          "velocity_fast_rise": 0.8,
+          "velocity_slow_decay": 0.95,
+          "acceleration_fast_rise": 0.9,
+          "acceleration_slow_decay": 0.98
+        }
       }
     }
   },

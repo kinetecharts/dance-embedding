@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Example of enabling OSC streaming in the recall system with single-stream data."""
 # to run: uv run examples/osc_streaming_example.py
+# or: source .venv/bin/activate and run: python examples/osc_streaming_example.py
 # address: /pose/data [15 values]
 
 import logging
