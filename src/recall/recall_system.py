@@ -112,7 +112,7 @@ class RecallSystem:
             logger.info("Starting live camera mode with LanceDB pose matching")
         
         # Start camera
-        if not self.pose_tracker.start_camera():
+        if not self.pose_tracker.start_camera(self.config.camera_id):
             logger.error("Failed to start camera")
             return
         

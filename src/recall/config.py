@@ -10,6 +10,7 @@ class RecallConfig:
     """Configuration for the recall system"""
     mode: str = "camera"  # "camera" or "video"
     input_video: Optional[str] = None  # Path to input video file
+    camera_id: int = 0  # Camera device ID to use
     top_n: int = 5
     match_every: int = 60  # frames
     match_interval: float = 2.0  # seconds
