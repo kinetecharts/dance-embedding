@@ -199,8 +199,9 @@ class MacVideoRecorder:
             if pose_data is not None:
                 recording_frame = self._draw_pose_overlay(recording_frame, pose_data)
             
-            # Add recording indicator
-            recording_frame = self._add_recording_indicator(recording_frame)
+            # NOTE: Do NOT add recording indicator to the frame that gets saved
+            # The recording indicator should only show on the live display
+            # This ensures clean recorded videos without UI elements
             
             # Warm-up period: buffer frames without writing to avoid glitching
             if not self.warmup_complete:
