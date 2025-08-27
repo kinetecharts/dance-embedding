@@ -21,39 +21,75 @@ logger = logging.getLogger(__name__)
 class RecallSystem:
     """Main system orchestrator for live pose matching and video playback with dual-window display"""
     
-    def __init__(self, config: RecallConfig):
+    def __init__(self, config: RecallConfig, osc_only: bool = False):
         self.config = config
+        self.osc_only = osc_only
         self.running = True
         self.paused = False
         
-        # Initialize JSON config loader for video file selection
-        self.config_loader = create_config_loader()
-        logger.info("✅ JSON config loader initialized")
-        
-        # Get filtered video files for matching
-        self.target_video_files = self.config_loader.get_video_files_for_matching(config.video_dir)
-        logger.info(f"Target videos for matching: {[f.stem for f in self.target_video_files]}")
-        
-        # Initialize components
-        self.pose_tracker = PoseTracker(config)
-        
-        # Create pose matcher with target video filtering
-        target_video_names = [f.name for f in self.target_video_files] if self.target_video_files else None
-        self.pose_matcher = PoseMatcher(config.__dict__, target_videos=target_video_names)
-        
-        # Create video player with target video information
-        self.video_player = create_video_player(config, with_controls=True, target_videos=self.target_video_files)
-        
-        # Initialize advanced OSC streamer if enabled
-        self.osc_streamer = None
-        if config.osc_enabled:
-            # Get OSC configuration from JSON config loader
-            osc_config = self.config_loader.config_data.get("osc_streaming", {})
-            self.osc_streamer = create_advanced_osc_streamer(osc_config)
-            if self.osc_streamer:
-                logger.info("✅ Advanced OSC streaming enabled with multiple streams")
-            else:
-                logger.warning("⚠️ OSC streaming configuration invalid or disabled")
+        if osc_only:
+            # Lightweight OSC-only mode - no video loading or matching
+            logger.info("🚀 Initializing lightweight OSC-only mode")
+            
+            # Initialize JSON config loader for OSC configuration only
+            self.config_loader = create_config_loader()
+            logger.info("✅ JSON config loader initialized for OSC")
+            
+            # Initialize only essential components
+            self.pose_tracker = PoseTracker(config)
+            
+            # Initialize advanced OSC streamer if enabled
+            self.osc_streamer = None
+            if config.osc_enabled:
+                # Get OSC configuration from JSON config loader
+                osc_config = self.config_loader.config_data.get("osc_streaming", {})
+                self.osc_streamer = create_advanced_osc_streamer(osc_config)
+                if self.osc_streamer:
+                    logger.info("✅ Advanced OSC streaming enabled with multiple streams")
+                else:
+                    logger.warning("⚠️ OSC streaming configuration invalid or disabled")
+            
+            # Skip heavy components
+            self.pose_matcher = None
+            self.video_player = None
+            self.target_video_files = []
+            
+            logger.info("✅ Lightweight OSC-only system initialized")
+            
+        else:
+            # Full mode with video matching
+            logger.info("🎬 Initializing full recall system with video matching")
+            
+            # Initialize JSON config loader for video file selection
+            self.config_loader = create_config_loader()
+            logger.info("✅ JSON config loader initialized")
+            
+            # Get filtered video files for matching
+            self.target_video_files = self.config_loader.get_video_files_for_matching(config.video_dir)
+            logger.info(f"Target videos for matching: {[f.stem for f in self.target_video_files]}")
+            
+            # Initialize components
+            self.pose_tracker = PoseTracker(config)
+            
+            # Create pose matcher with target video filtering
+            target_video_names = [f.name for f in self.target_video_files] if self.target_video_files else None
+            self.pose_matcher = PoseMatcher(config.__dict__, target_videos=target_video_names)
+            
+            # Create video player with target video information
+            self.video_player = create_video_player(config, with_controls=True, target_videos=self.target_video_files)
+            
+            # Initialize advanced OSC streamer if enabled
+            self.osc_streamer = None
+            if config.osc_enabled:
+                # Get OSC configuration from JSON config loader
+                osc_config = self.config_loader.config_data.get("osc_streaming", {})
+                self.osc_streamer = create_advanced_osc_streamer(osc_config)
+                if self.osc_streamer:
+                    logger.info("✅ Advanced OSC streaming enabled with multiple streams")
+                else:
+                    logger.warning("⚠️ OSC streaming configuration invalid or disabled")
+            
+            logger.info("✅ Full recall system initialized with LanceDB-based pose matching")
         
         # State tracking
         self.current_pose = None
@@ -67,12 +103,13 @@ class RecallSystem:
         self.fps_counter = 0
         self.last_fps_time = 0
         self.current_fps = 0.0
-        
-        logger.info("Recall system initialized with LanceDB-based pose matching")
     
     def run_live(self):
         """Main live processing loop with dual-window display"""
-        logger.info("Starting live camera mode with LanceDB pose matching")
+        if self.osc_only:
+            logger.info("Starting lightweight OSC-only mode - camera input only")
+        else:
+            logger.info("Starting live camera mode with LanceDB pose matching")
         
         # Start camera
         if not self.pose_tracker.start_camera():
@@ -81,11 +118,8 @@ class RecallSystem:
         
         self.start_time = time.time()
         logger.info("✅ Camera started successfully")
-        logger.info("Press 'q' in any video window to quit")
-        logger.info(f"🎯 Matching every {self.config.match_interval} seconds")
-        logger.info(f"🎬 Playing matched videos for {self.config.match_playback_duration} seconds")
         
-        # Create initial live camera window
+        # Create initial live camera window (both modes need this)
         logger.info("Creating live camera window...")
         try:
             # Get initial frame to create window
@@ -93,8 +127,15 @@ class RecallSystem:
             if result is not None:
                 pose_data, frame = result
                 logger.info(f"Got initial frame: {frame.shape}")
-                self.video_player.display_live_frame(frame, pose_data, None)
-                logger.info("✅ Live camera window created successfully")
+                
+                if self.osc_only:
+                    # OSC-only mode: create a simple display window
+                    cv2.imshow("Live Camera - OSC Only", frame)
+                    logger.info("✅ Live camera window created successfully (OSC-only mode)")
+                else:
+                    # Full mode: use video player display
+                    self.video_player.display_live_frame(frame, pose_data, None)
+                    logger.info("✅ Live camera window created successfully (full mode)")
                 
                 # Force window to appear
                 cv2.waitKey(100)
@@ -103,6 +144,14 @@ class RecallSystem:
                 logger.warning("No initial frame available")
         except Exception as e:
             logger.error(f"Error creating live camera window: {e}")
+        
+        if self.osc_only:
+            logger.info("🚀 OSC-only mode: Press 'q' in video window to quit")
+            logger.info("📡 Streaming pose data to configured OSC endpoints")
+        else:
+            logger.info("Press 'q' in any video window to quit")
+            logger.info(f"🎯 Matching every {self.config.match_interval} seconds")
+            logger.info(f"🎬 Playing matched videos for {self.config.match_playback_duration} seconds")
         
         try:
             while self.running:
@@ -117,12 +166,17 @@ class RecallSystem:
                 
                 pose_data, frame = result
                 if pose_data is None:
-                    # No pose detected, still show frame
-                    key = self.video_player.display_live_frame(frame)
-                    if key == ord('q'):
-                        logger.info("Q pressed - quitting")
-                        break
-                    continue
+                    # No pose detected
+                    if self.osc_only:
+                        # In OSC-only mode, just continue without display
+                        continue
+                    else:
+                        # Show frame in full mode
+                        key = self.video_player.display_live_frame(frame)
+                        if key == ord('q'):
+                            logger.info("Q pressed - quitting")
+                            break
+                        continue
                 
                 self.current_pose = pose_data
                 self.frame_count += 1
@@ -134,30 +188,53 @@ class RecallSystem:
                 else:
                     logger.debug("No OSC streamer available")
                 
-                # Check if it's time to match (every 2 seconds)
-                current_time = time.time()
-                if current_time - self.last_match_time >= self.config.match_interval:
-                    logger.info(f"🎯 Performing match at {current_time:.1f}s")
-                    self._perform_matching(pose_data)
-                    self.last_match_time = current_time
-                
-                # Display live frame with current match info
-                current_match = self.video_player.current_match
-                key = self.video_player.display_live_frame(frame, pose_data, current_match)
-                
-                # Handle key press
-                if key == ord('q'):
-                    logger.info("Q pressed - quitting")
-                    break
-                
-                # Update FPS
-                self._update_fps()
-                
-                # Show metrics in terminal
-                self._show_metrics()
-                
-                # Sleep to maintain frame rate
-                time.sleep(0.033)  # ~30 FPS
+                if self.osc_only:
+                    # OSC-only mode: display frame and stream data, no matching
+                    # Draw pose landmarks on frame
+                    display_frame = self._draw_pose_on_frame(frame, pose_data)
+                    
+                    # Display live frame with pose visualization
+                    cv2.imshow("Live Camera - OSC Only", display_frame)
+                    
+                    # Handle key press for OSC-only mode
+                    key = cv2.waitKey(1) & 0xFF
+                    if key == ord('q'):
+                        logger.info("Q pressed - quitting")
+                        break
+                    
+                    # Update FPS and show basic metrics
+                    self._update_fps()
+                    if self.frame_count % 30 == 0:  # Show metrics every 30 frames
+                        self._show_basic_metrics()
+                    
+                    # Sleep to maintain frame rate
+                    time.sleep(0.033)  # ~30 FPS
+                else:
+                    # Full mode: perform matching and display
+                    # Check if it's time to match (every 2 seconds)
+                    current_time = time.time()
+                    if current_time - self.last_match_time >= self.config.match_interval:
+                        logger.info(f"🎯 Performing match at {current_time:.1f}s")
+                        self._perform_matching(pose_data)
+                        self.last_match_time = current_time
+                    
+                    # Display live frame with current match info
+                    current_match = self.video_player.current_match
+                    key = self.video_player.display_live_frame(frame, pose_data, current_match)
+                    
+                    # Handle key press
+                    if key == ord('q'):
+                        logger.info("Q pressed - quitting")
+                        break
+                    
+                    # Update FPS
+                    self._update_fps()
+                    
+                    # Show metrics in terminal
+                    self._show_metrics()
+                    
+                    # Sleep to maintain frame rate
+                    time.sleep(0.033)  # ~30 FPS
                 
         except KeyboardInterrupt:
             logger.info("Interrupted by user")
@@ -292,6 +369,93 @@ class RecallSystem:
             self.fps_counter = 0
             self.last_fps_time = current_time
     
+    def _draw_pose_on_frame(self, frame, pose_data):
+        """Draw pose landmarks on frame for OSC-only mode - using same method as video player"""
+        try:
+            if not pose_data or not hasattr(pose_data, 'landmarks') or pose_data.landmarks is None or len(pose_data.landmarks) == 0:
+                logger.debug("No pose data or landmarks available")
+                return frame
+            
+            # Debug logging
+            logger.debug(f"Drawing pose: landmarks shape: {pose_data.landmarks.shape}, has confidence: {hasattr(pose_data, 'confidence')}")
+            if hasattr(pose_data, 'confidence'):
+                logger.debug(f"Confidence shape: {pose_data.confidence.shape}, sample values: {pose_data.confidence[:5]}")
+            
+            # Create a copy of the frame to draw on
+            display_frame = frame.copy()
+            
+            # Check if we have confidence data
+            if hasattr(pose_data, 'confidence') and pose_data.confidence is not None:
+                # Draw pose landmarks (same as video player)
+                for i, (landmark, confidence) in enumerate(zip(pose_data.landmarks, pose_data.confidence)):
+                    if float(confidence) > 0.5:  # Convert numpy value to float for comparison
+                        x, y = int(landmark[0] * frame.shape[1]), int(landmark[1] * frame.shape[0])
+                        cv2.circle(display_frame, (x, y), 3, (0, 0, 255), -1)  # Red for live pose (same as video player)
+                
+                # Draw skeleton connections (exactly same as video player)
+                connections = [
+                    (11, 12), (11, 13), (13, 15), (12, 14), (14, 16),  # Arms
+                    (11, 23), (12, 24), (23, 24),  # Torso
+                    (23, 25), (25, 27), (27, 29), (27, 31),  # Left leg
+                    (24, 26), (26, 28), (28, 30), (28, 32),  # Right leg
+                    (0, 1), (1, 2), (2, 3), (3, 7), (0, 4), (4, 5), (5, 6),  # Face
+                    (0, 9), (9, 10), (10, 11), (0, 9), (9, 10), (10, 12)  # Neck
+                ]
+                
+                for start_idx, end_idx in connections:
+                    if (start_idx < len(pose_data.landmarks) and end_idx < len(pose_data.landmarks) and
+                        float(pose_data.confidence[start_idx]) > 0.5 and float(pose_data.confidence[end_idx]) > 0.5):
+                        start_pos = pose_data.landmarks[start_idx]
+                        end_pos = pose_data.landmarks[end_idx]
+                        start_x, start_y = int(start_pos[0] * frame.shape[1]), int(start_pos[1] * frame.shape[0])
+                        end_x, end_y = int(end_pos[0] * frame.shape[1]), int(end_pos[1] * frame.shape[0])
+                        cv2.line(display_frame, (start_x, start_y), (end_x, end_y), (0, 0, 255), 2)  # Red for live pose (same as video player)
+            else:
+                # Fallback: draw all landmarks without confidence filtering
+                logger.debug("No confidence data, drawing all landmarks")
+                for i, landmark in enumerate(pose_data.landmarks):
+                    x, y = int(landmark[0] * frame.shape[1]), int(landmark[1] * frame.shape[0])
+                    cv2.circle(display_frame, (x, y), 3, (0, 0, 255), -1)  # Red for live pose
+                
+                # Draw basic skeleton connections
+                basic_connections = [
+                    (11, 12), (11, 13), (13, 15), (12, 14), (14, 16),  # Arms
+                    (11, 23), (12, 24), (23, 24),  # Torso
+                    (23, 25), (25, 27), (24, 26), (26, 28),  # Legs
+                ]
+                
+                for start_idx, end_idx in basic_connections:
+                    if (start_idx < len(pose_data.landmarks) and end_idx < len(pose_data.landmarks)):
+                        start_pos = pose_data.landmarks[start_idx]
+                        end_pos = pose_data.landmarks[end_idx]
+                        start_x, start_y = int(start_pos[0] * frame.shape[1]), int(start_pos[1] * frame.shape[0])
+                        end_x, end_y = int(end_pos[0] * frame.shape[1]), int(end_pos[1] * frame.shape[0])
+                        cv2.line(display_frame, (start_x, start_y), (end_x, end_y), (0, 0, 255), 2)
+            
+            return display_frame
+            
+        except Exception as e:
+            logger.warning(f"Error drawing pose on frame: {e}")
+            logger.debug(f"Pose data type: {type(pose_data)}")
+            if hasattr(pose_data, '__dict__'):
+                logger.debug(f"Pose data attributes: {pose_data.__dict__.keys()}")
+            import traceback
+            logger.debug(f"Full traceback: {traceback.format_exc()}")
+            return frame
+    
+    def _show_basic_metrics(self):
+        """Show basic metrics for OSC-only mode"""
+        elapsed = time.time() - self.start_time if self.start_time else 0
+        avg_fps = self.frame_count / elapsed if elapsed > 0 else 0
+        
+        print(f"\033[2J\033[H")  # Clear screen and move cursor to top
+        print(f"🚀 OSC-Only Mode - Frame {self.frame_count}")
+        print(f"⏱️  Elapsed: {elapsed:.1f}s | FPS: {self.current_fps:.1f} | Avg: {avg_fps:.1f}")
+        print(f"📡 OSC Streaming: {'✅' if self.osc_streamer else '❌'}")
+        print(f"📹 Camera: ✅ | Pose Detection: ✅")
+        print(f"💡 Press 'q' in video window to quit")
+        print(f"{'='*50}")
+    
     def _show_metrics(self):
         """Show real-time metrics"""
         if self.frame_count % 30 == 0:  # Every 30 frames
@@ -314,6 +478,9 @@ class RecallSystem:
             self.osc_streamer.close()
             logger.info("OSC streamer closed")
         
+        # Close OpenCV windows
+        cv2.destroyAllWindows()
+        
         # Show final statistics
         self._show_final_stats()
         
@@ -333,10 +500,13 @@ class RecallSystem:
         logger.info(f"Total matches found: {len(self.matches_history)}")
         
         # Show pose matcher stats
-        matcher_stats = self.pose_matcher.get_performance_stats()
-        if "avg_match_time" in matcher_stats:
-            logger.info(f"Average match time: {matcher_stats['avg_match_time']:.3f}s")
-            logger.info(f"Total matches performed: {matcher_stats['total_matches']}")
+        if self.pose_matcher:
+            matcher_stats = self.pose_matcher.get_performance_stats()
+            if "avg_match_time" in matcher_stats:
+                logger.info(f"Average match time: {matcher_stats['avg_match_time']:.3f}s")
+                logger.info(f"Total matches performed: {matcher_stats['total_matches']}")
+        else:
+            logger.info("Mode: OSC-only (no pose matching)")
         
         logger.info("=" * 50)
     
@@ -367,7 +537,7 @@ class RecallSystem:
         elapsed = time.time() - self.start_time if self.start_time else 0
         avg_fps = self.frame_count / elapsed if elapsed > 0 else 0
         
-        return {
+        stats = {
             "frame_count": self.frame_count,
             "elapsed_time": elapsed,
             "current_fps": self.current_fps,
@@ -375,8 +545,15 @@ class RecallSystem:
             "total_matches": len(self.matches_history),
             "current_pose": self.current_pose is not None,
             "paused": self.paused,
-            "matcher_stats": self.pose_matcher.get_performance_stats()
         }
+        
+        # Add matcher stats only if pose matcher exists
+        if self.pose_matcher:
+            stats["matcher_stats"] = self.pose_matcher.get_performance_stats()
+        else:
+            stats["matcher_stats"] = {"mode": "osc_only"}
+        
+        return stats
     
     def get_match_history(self) -> List[List[Match]]:
         """Get match history"""
@@ -413,8 +590,8 @@ class RecallSystem:
 class RecallSystemWithKeyboard(RecallSystem):
     """Recall system with keyboard controls"""
     
-    def __init__(self, config: RecallConfig):
-        super().__init__(config)
+    def __init__(self, config: RecallConfig, osc_only: bool = False):
+        super().__init__(config, osc_only=osc_only)
         self._setup_keyboard_controls()
     
     def _setup_keyboard_controls(self):
@@ -444,9 +621,12 @@ class RecallSystemWithKeyboard(RecallSystem):
         keyboard_thread.start()
 
 
-def create_recall_system(config: RecallConfig, with_keyboard: bool = True) -> RecallSystem:
+def create_recall_system(config: RecallConfig, with_keyboard: bool = True, osc_only: bool = False) -> RecallSystem:
     """Create a recall system instance"""
-    if with_keyboard:
-        return RecallSystemWithKeyboard(config)
+    if osc_only:
+        # OSC-only mode - lightweight system without keyboard controls
+        return RecallSystem(config, osc_only=True)
+    elif with_keyboard:
+        return RecallSystemWithKeyboard(config, osc_only=False)
     else:
-        return RecallSystem(config) 
+        return RecallSystem(config, osc_only=False) 
