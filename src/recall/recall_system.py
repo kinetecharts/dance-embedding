@@ -140,10 +140,10 @@ class RecallSystem:
             frame_width = int(self.pose_tracker.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
             frame_height = int(self.pose_tracker.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
             
-            # Use a lower frame rate to match actual processing speed and avoid video speed-up
-            recording_fps = min(15, self.config.record_fps)  # Cap at 15 FPS for smooth playback
+            # Use the actual camera frame rate to avoid video stretching/slowing
+            recording_fps = self.config.record_fps  # Use full 30 FPS to match real-time speed
             
-            logger.info(f"🎬 Attempting to start video recording: {frame_width}x{frame_height} @ {recording_fps} FPS (capped from {self.config.record_fps}), {self.config.record_quality} quality")
+            logger.info(f"🎬 Attempting to start video recording: {frame_width}x{frame_height} @ {recording_fps} FPS, {self.config.record_quality} quality")
             
             if self.video_recorder.start_recording(
                 frame_width, frame_height, 
@@ -243,7 +243,7 @@ class RecallSystem:
                     # Draw pose landmarks on frame
                     display_frame = self._draw_pose_on_frame(frame, pose_data)
                     
-                    # Add frame to video recording if active
+                    # Add frame to video recording if active (record every frame, not just pose frames)
                     if self.video_recorder and self.video_recorder.is_recording():
                         self.video_recorder.record_frame(display_frame, pose_data)
                     
@@ -292,7 +292,7 @@ class RecallSystem:
                     current_match = self.video_player.current_match
                     key = self.video_player.display_live_frame(frame, pose_data, current_match)
                     
-                    # Add frame to video recording if active
+                    # Add frame to video recording if active (record every frame, not just pose frames)
                     if self.video_recorder and self.video_recorder.is_recording():
                         self.video_recorder.record_frame(frame, pose_data)
                     
@@ -437,7 +437,11 @@ class RecallSystem:
         current_time = time.time()
         
         if current_time - self.last_fps_time >= 1.0:
-            self.current_fps = self.fps_counter / (current_time - self.last_fps_time)
+            time_diff = current_time - self.last_fps_time
+            if time_diff > 0.1:  # Add small buffer to avoid division by zero
+                self.current_fps = self.fps_counter / time_diff
+            else:
+                self.current_fps = 0
             self.fps_counter = 0
             self.last_fps_time = current_time
     
@@ -518,12 +522,21 @@ class RecallSystem:
     def _show_basic_metrics(self):
         """Show basic metrics for OSC-only mode"""
         elapsed = time.time() - self.start_time if self.start_time else 0
-        avg_fps = self.frame_count / elapsed if elapsed > 0 else 0
+        avg_fps = self.frame_count / elapsed if elapsed > 0.1 else 0  # Add small buffer to avoid division by zero
         
         # Get recording status
         if self.video_recorder and self.video_recorder.is_recording():
-            recording_status = "🔴 RECORDING"
-            recording_stats = self.video_recorder.get_recording_stats()
+            warmup_status = self.video_recorder.get_warmup_status()
+            
+            if warmup_status["status"] == "warming_up":
+                progress = warmup_status["progress"]
+                total = warmup_status["total"]
+                percent = warmup_status["percent"]
+                recording_status = f"🟠 WARMING UP ({percent}%)"
+                recording_stats = {}
+            else:
+                recording_status = "🔴 RECORDING"
+                recording_stats = self.video_recorder.get_recording_stats()
         else:
             recording_status = "⚪ STOPPED"
             recording_stats = {}
@@ -535,7 +548,10 @@ class RecallSystem:
         print(f"📹 Camera: ✅ | Pose Detection: ✅")
         print(f"🎬 Recording: {recording_status}")
         
-        if recording_stats:
+        if warmup_status and warmup_status["status"] == "warming_up":
+            print(f"   🔥 Progress: {progress}/{total} frames ({percent}%)")
+            print(f"   📁 Output: {self.video_recorder.current_filename}")
+        elif recording_stats:
             print(f"   📊 Frames: {recording_stats.get('frame_count', 0)} | Time: {recording_stats.get('elapsed_time', 0):.1f}s")
             print(f"   📁 Output: {recording_stats.get('filename', 'N/A')}")
         
@@ -609,7 +625,7 @@ class RecallSystem:
     def _show_final_stats(self):
         """Show final performance statistics"""
         elapsed = time.time() - self.start_time if self.start_time else 0
-        avg_fps = self.frame_count / elapsed if elapsed > 0 else 0
+        avg_fps = self.frame_count / elapsed if elapsed > 0.1 else 0  # Add small buffer to avoid division by zero
         
         logger.info("=" * 50)
         logger.info("FINAL STATISTICS")
@@ -655,7 +671,7 @@ class RecallSystem:
     def get_statistics(self) -> dict:
         """Get current system statistics"""
         elapsed = time.time() - self.start_time if self.start_time else 0
-        avg_fps = self.frame_count / elapsed if elapsed > 0 else 0
+        avg_fps = self.frame_count / elapsed if elapsed > 0.1 else 0  # Add small buffer to avoid division by zero
         
         stats = {
             "frame_count": self.frame_count,
