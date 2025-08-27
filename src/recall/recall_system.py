@@ -205,19 +205,11 @@ class RecallSystem:
                     # No pose detected
                     if self.osc_only:
                         # In OSC-only mode, still show the frame even without pose
-                        # Create a copy for live display with recording indicator
-                        live_frame = frame.copy()
-                        
-                        # Add recording indicator to LIVE display only (not to recorded video)
-                        if self.video_recorder and self.video_recorder.is_recording():
-                            live_frame = self.video_recorder._add_recording_indicator(live_frame)
-                        
                         # Add frame to video recording if active (record every frame, not just pose frames)
-                        # Use the clean frame (without recording indicator) for recording
                         if self.video_recorder and self.video_recorder.is_recording():
                             self.video_recorder.record_frame(frame, None)
                         
-                        cv2.imshow("Live Camera - OSC Only", live_frame)
+                        cv2.imshow("Live Camera - OSC Only", frame)
                         
                         # Handle key press for OSC-only mode
                         key = cv2.waitKey(1) & 0xFF
@@ -255,20 +247,12 @@ class RecallSystem:
                     # Draw pose landmarks on frame
                     display_frame = self._draw_pose_on_frame(frame, pose_data)
                     
-                    # Create a separate frame for live display with recording indicator
-                    live_display_frame = display_frame.copy()
-                    
-                    # Add recording indicator to LIVE display only (not to recorded video)
-                    if self.video_recorder and self.video_recorder.is_recording():
-                        live_display_frame = self.video_recorder._add_recording_indicator(live_display_frame)
-                    
                     # Add frame to video recording if active (record every frame, not just pose frames)
-                    # Use the clean display_frame (without recording indicator) for recording
                     if self.video_recorder and self.video_recorder.is_recording():
                         self.video_recorder.record_frame(display_frame, pose_data)
                     
-                    # Display live frame with pose visualization and recording indicator
-                    cv2.imshow("Live Camera - OSC Only", live_display_frame)
+                    # Display live frame with pose visualization (no recording indicator)
+                    cv2.imshow("Live Camera - OSC Only", display_frame)
                     
                     # Handle key press for OSC-only mode
                     key = cv2.waitKey(1) & 0xFF
