@@ -18,6 +18,9 @@ Usage:
     # Use specific camera
     uv run examples/osc_streaming_example.py --camera-id 1
     
+    # Enable video recording with audio
+    uv run examples/osc_streaming_example.py --record-video
+    
     # Custom matching intervals
     uv run examples/osc_streaming_example.py --match-interval 2.0 --match-duration 1.0
 """
@@ -78,6 +81,36 @@ def list_available_cameras():
     
     return available_cameras
 
+def check_recording_dependencies():
+    """Check if required dependencies for video recording are available"""
+    missing_deps = []
+    
+    try:
+        import cv2
+    except ImportError:
+        missing_deps.append("opencv-python")
+    
+    try:
+        import numpy as np
+    except ImportError:
+        missing_deps.append("numpy")
+    
+    # Check for audio recording capabilities
+    try:
+        import pyaudio
+    except ImportError:
+        missing_deps.append("pyaudio")
+    
+    if missing_deps:
+        print("❌ Missing dependencies for video recording:")
+        for dep in missing_deps:
+            print(f"   - {dep}")
+        print("\n💡 Install with: uv add <dependency>")
+        return False
+    
+    print("✅ All video recording dependencies available")
+    return True
+
 def main():
     """Main function for OSC streaming example"""
     parser = argparse.ArgumentParser(
@@ -96,6 +129,12 @@ Examples:
     
     # List available cameras
     uv run examples/osc_streaming_example.py --list-cameras
+    
+    # Record video with audio
+    uv run examples/osc_streaming_example.py --record-video
+    
+    # Record with custom settings
+    uv run examples/osc_streaming_example.py --record-video --record-fps 30 --record-quality high
         """
     )
     
@@ -132,6 +171,34 @@ Examples:
         help="Camera device ID to use (default: 0)"
     )
     
+    # Video recording options
+    parser.add_argument(
+        "--record-video",
+        action="store_true",
+        help="Enable video recording with pose overlay and audio"
+    )
+    
+    parser.add_argument(
+        "--record-fps",
+        type=int,
+        default=30,
+        help="Recording frame rate (default: 30)"
+    )
+    
+    parser.add_argument(
+        "--record-quality",
+        choices=["low", "medium", "high"],
+        default="medium",
+        help="Video quality setting (default: medium)"
+    )
+    
+    parser.add_argument(
+        "--record-dir",
+        type=str,
+        default="recordings",
+        help="Directory to save recordings (default: recordings)"
+    )
+    
     args = parser.parse_args()
     
     # Set up logging
@@ -145,6 +212,12 @@ Examples:
     if args.list_cameras:
         list_available_cameras()
         return
+    
+    # Check recording dependencies if needed
+    if args.record_video:
+        if not check_recording_dependencies():
+            logger.error("Cannot proceed with video recording due to missing dependencies")
+            return
     
     # Load configuration
     config_path = Path(__file__).parent.parent / "src" / "recall" / "config.json"
@@ -165,12 +238,23 @@ Examples:
         config.camera_id = args.camera_id
         logger.info(f"📹 Using camera ID: {args.camera_id}")
     
+    # Update recording settings in config
+    if args.record_video:
+        config.record_video = True
+        config.record_fps = args.record_fps
+        config.record_quality = args.record_quality
+        config.record_dir = args.record_dir
+        logger.info(f"🎥 Video recording enabled: {args.record_fps} FPS, {args.record_quality} quality")
+        logger.info(f"💾 Recordings will be saved to: {args.record_dir}")
+    
     # Create and run recall system
     try:
         if args.skip_matching:
             logger.info("🚀 Starting OSC-only mode (no video matching)")
             logger.info("📡 Streaming pose data to OSC ports 6448 and 1234")
             logger.info("🎥 Video display with pose visualization enabled")
+            if args.record_video:
+                logger.info("🎬 Video recording with audio enabled")
             logger.info("💡 Press 'q' in video window to quit")
             
             # In OSC-only mode, these values aren't used but set defaults
@@ -180,6 +264,8 @@ Examples:
             logger.info("🚀 Starting full recall system with OSC streaming")
             logger.info(f"📡 Streaming pose data to OSC ports 6448 and 1234")
             logger.info(f"🎯 Pose matching every {args.match_interval}s for {args.match_duration}s")
+            if args.record_video:
+                logger.info("🎬 Video recording with audio enabled")
             logger.info("💡 Press 'q' in video window to quit")
             
             match_interval = args.match_interval

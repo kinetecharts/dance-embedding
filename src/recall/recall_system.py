@@ -14,6 +14,7 @@ from .pose_matcher import PoseMatcher
 from .video_player import create_video_player
 from .advanced_osc_streamer import create_advanced_osc_streamer
 from .json_config_loader import create_config_loader
+from .video_recorder import MacVideoRecorder
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +49,12 @@ class RecallSystem:
                     logger.info("✅ Advanced OSC streaming enabled with multiple streams")
                 else:
                     logger.warning("⚠️ OSC streaming configuration invalid or disabled")
+            
+            # Initialize video recorder if enabled
+            self.video_recorder = None
+            if config.record_video:
+                self.video_recorder = MacVideoRecorder(config, config.record_dir)
+                logger.info("✅ Video recorder initialized")
             
             # Skip heavy components
             self.pose_matcher = None
@@ -89,6 +96,12 @@ class RecallSystem:
                 else:
                     logger.warning("⚠️ OSC streaming configuration invalid or disabled")
             
+            # Initialize video recorder if enabled
+            self.video_recorder = None
+            if config.record_video:
+                self.video_recorder = MacVideoRecorder(config, config.record_dir)
+                logger.info("✅ Video recorder initialized")
+            
             logger.info("✅ Full recall system initialized with LanceDB-based pose matching")
         
         # State tracking
@@ -98,6 +111,8 @@ class RecallSystem:
         self.frame_count = 0
         self.start_time = None
         self.last_match_time = 0
+        
+
         
         # Performance tracking
         self.fps_counter = 0
@@ -118,6 +133,27 @@ class RecallSystem:
         
         self.start_time = time.time()
         logger.info("✅ Camera started successfully")
+        
+        # Start video recording if enabled
+        if self.video_recorder:
+            # Get frame dimensions from camera
+            frame_width = int(self.pose_tracker.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            frame_height = int(self.pose_tracker.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            
+            # Use a lower frame rate to match actual processing speed and avoid video speed-up
+            recording_fps = min(15, self.config.record_fps)  # Cap at 15 FPS for smooth playback
+            
+            logger.info(f"🎬 Attempting to start video recording: {frame_width}x{frame_height} @ {recording_fps} FPS (capped from {self.config.record_fps}), {self.config.record_quality} quality")
+            
+            if self.video_recorder.start_recording(
+                frame_width, frame_height, 
+                recording_fps,  # Use capped FPS to match processing speed
+                self.config.record_quality
+            ):
+                logger.info("✅ Video recording started")
+            else:
+                logger.error("Failed to start video recording")
+                self.video_recorder = None
         
         # Create initial live camera window (both modes need this)
         logger.info("Creating live camera window...")
@@ -182,8 +218,7 @@ class RecallSystem:
                         if self.frame_count % 30 == 0:  # Show metrics every 30 frames
                             self._show_basic_metrics()
                         
-                        # Sleep to maintain frame rate
-                        time.sleep(0.033)  # ~30 FPS
+                        # Don't sleep - let it run as fast as possible for smooth video
                         continue
                     else:
                         # Show frame in full mode
@@ -208,6 +243,10 @@ class RecallSystem:
                     # Draw pose landmarks on frame
                     display_frame = self._draw_pose_on_frame(frame, pose_data)
                     
+                    # Add frame to video recording if active
+                    if self.video_recorder and self.video_recorder.is_recording():
+                        self.video_recorder.record_frame(display_frame, pose_data)
+                    
                     # Display live frame with pose visualization
                     cv2.imshow("Live Camera - OSC Only", display_frame)
                     
@@ -216,14 +255,30 @@ class RecallSystem:
                     if key == ord('q'):
                         logger.info("Q pressed - quitting")
                         break
+                    elif key == ord('v'):  # V to start/stop video recording
+                        if self.video_recorder and self.video_recorder.is_recording():
+                            logger.info("Stopping video recording...")
+                            self.video_recorder.stop_recording()
+                        elif self.video_recorder and not self.config.record_video:
+                            # Only allow manual start if --record-video flag was not passed
+                            logger.info("Starting video recording...")
+                            frame_width = int(self.pose_tracker.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                            frame_height = int(self.pose_tracker.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                            self.video_recorder.start_recording(frame_width, frame_height, 
+                                                             self.config.record_fps, 
+                                                             self.config.record_quality)
+                        elif self.video_recorder and self.config.record_video:
+                            logger.info("Recording already started automatically with --record-video flag")
+                            logger.info("Press 'V' again to stop recording")
+                    elif key == ord('h'):  # H to show help
+                        self._show_recording_help()
                     
                     # Update FPS and show basic metrics
                     self._update_fps()
                     if self.frame_count % 30 == 0:  # Show metrics every 30 frames
                         self._show_basic_metrics()
                     
-                    # Sleep to maintain frame rate
-                    time.sleep(0.033)  # ~30 FPS
+                    # Don't sleep - let it run as fast as possible for smooth video
                 else:
                     # Full mode: perform matching and display
                     # Check if it's time to match (every 2 seconds)
@@ -237,6 +292,10 @@ class RecallSystem:
                     current_match = self.video_player.current_match
                     key = self.video_player.display_live_frame(frame, pose_data, current_match)
                     
+                    # Add frame to video recording if active
+                    if self.video_recorder and self.video_recorder.is_recording():
+                        self.video_recorder.record_frame(frame, pose_data)
+                    
                     # Handle key press
                     if key == ord('q'):
                         logger.info("Q pressed - quitting")
@@ -248,8 +307,7 @@ class RecallSystem:
                     # Show metrics in terminal
                     self._show_metrics()
                     
-                    # Sleep to maintain frame rate
-                    time.sleep(0.033)  # ~30 FPS
+                    # Don't sleep - let it run as fast as possible for smooth video
                 
         except KeyboardInterrupt:
             logger.info("Interrupted by user")
@@ -329,8 +387,7 @@ class RecallSystem:
                 # Show metrics in terminal
                 self._show_metrics()
                 
-                # Sleep to maintain frame rate
-                time.sleep(0.033)  # ~30 FPS
+                # Don't sleep - let it run as fast as possible for smooth video
                 
         except KeyboardInterrupt:
             logger.info("Interrupted by user")
@@ -463,13 +520,56 @@ class RecallSystem:
         elapsed = time.time() - self.start_time if self.start_time else 0
         avg_fps = self.frame_count / elapsed if elapsed > 0 else 0
         
+        # Get recording status
+        if self.video_recorder and self.video_recorder.is_recording():
+            recording_status = "🔴 RECORDING"
+            recording_stats = self.video_recorder.get_recording_stats()
+        else:
+            recording_status = "⚪ STOPPED"
+            recording_stats = {}
+        
         print(f"\033[2J\033[H")  # Clear screen and move cursor to top
         print(f"🚀 OSC-Only Mode - Frame {self.frame_count}")
         print(f"⏱️  Elapsed: {elapsed:.1f}s | FPS: {self.current_fps:.1f} | Avg: {avg_fps:.1f}")
         print(f"📡 OSC Streaming: {'✅' if self.osc_streamer else '❌'}")
         print(f"📹 Camera: ✅ | Pose Detection: ✅")
-        print(f"💡 Press 'q' in video window to quit")
+        print(f"🎬 Recording: {recording_status}")
+        
+        if recording_stats:
+            print(f"   📊 Frames: {recording_stats.get('frame_count', 0)} | Time: {recording_stats.get('elapsed_time', 0):.1f}s")
+            print(f"   📁 Output: {recording_stats.get('filename', 'N/A')}")
+        
+        if self.config.record_video:
+            print(f"💡 Press 'q' to quit | 'v' to stop recording | 'h' for help")
+        else:
+            print(f"💡 Press 'q' to quit | 'v' to start/stop recording | 'h' for help")
         print(f"{'='*50}")
+    
+
+    
+    def _show_recording_help(self):
+        """Show recording controls help"""
+        print("\n" + "=" * 50)
+        print("🎬 VIDEO RECORDING CONTROLS")
+        print("=" * 50)
+        
+        if self.config.record_video:
+            print("🎥 AUTO-RECORDING MODE (--record-video flag passed)")
+            print("V - Stop video recording (recording started automatically)")
+        else:
+            print("🎥 MANUAL RECORDING MODE")
+            print("V - Start/Stop video recording")
+        
+        print("Q - Quit the application")
+        print("H - Show this help")
+        print("")
+        print("📹 RECORDING FEATURES:")
+        print("• Video + stick figure overlay + microphone audio")
+        print("• Mac-optimized H.264 compression (hardware accelerated)")
+        print("• Automatic saving to prevent data loss")
+        print("• Organized storage with timestamps")
+        print(f"• Output directory: {self.config.record_dir}/")
+        print("=" * 50)
     
     def _show_metrics(self):
         """Show real-time metrics"""
@@ -492,6 +592,11 @@ class RecallSystem:
         if self.osc_streamer:
             self.osc_streamer.close()
             logger.info("OSC streamer closed")
+        
+        # Stop video recording if active
+        if self.video_recorder and self.video_recorder.is_recording():
+            logger.info("Stopping active video recording...")
+            self.video_recorder.stop_recording()
         
         # Close OpenCV windows
         cv2.destroyAllWindows()

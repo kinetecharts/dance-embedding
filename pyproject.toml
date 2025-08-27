@@ -50,6 +50,8 @@ dependencies = [
     "pathlib2>=2.3.0; python_version < '3.4'",
     # OSC streaming
     "python-osc>=1.8.0",
+    # Audio recording
+    "pyaudio>=0.2.14",
     # Monitoring
     "watchdog>=3.0.0",
 ]

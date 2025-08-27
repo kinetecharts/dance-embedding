@@ -28,6 +28,12 @@ class RecallConfig:
     # OSC streaming configuration (now handled by JSON config)
     osc_enabled: bool = False
     
+    # Video recording configuration
+    record_video: bool = False
+    record_fps: int = 30
+    record_quality: str = "medium"  # "low", "medium", "high"
+    record_dir: str = "recordings"
+    
     # Joint weights for weighted similarity
     joint_weights: Optional[Dict[str, float]] = field(default_factory=lambda: {
         'nose': 1.0,
