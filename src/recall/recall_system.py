@@ -168,7 +168,22 @@ class RecallSystem:
                 if pose_data is None:
                     # No pose detected
                     if self.osc_only:
-                        # In OSC-only mode, just continue without display
+                        # In OSC-only mode, still show the frame even without pose
+                        cv2.imshow("Live Camera - OSC Only", frame)
+                        
+                        # Handle key press for OSC-only mode
+                        key = cv2.waitKey(1) & 0xFF
+                        if key == ord('q'):
+                            logger.info("Q pressed - quitting")
+                            break
+                        
+                        # Update FPS and show basic metrics
+                        self._update_fps()
+                        if self.frame_count % 30 == 0:  # Show metrics every 30 frames
+                            self._show_basic_metrics()
+                        
+                        # Sleep to maintain frame rate
+                        time.sleep(0.033)  # ~30 FPS
                         continue
                     else:
                         # Show frame in full mode
