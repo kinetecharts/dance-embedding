@@ -106,7 +106,7 @@ When `--sync` is used:
 
 - **Only Remote files**: Downloaded to local directory (creates parent directories as needed)
 - **Only Local files**: Uploaded to remote bucket
-- **Different Sizes**: 
+- **Different Sizes**
   - Without `--local-overwrites`: Remote version overwrites local
   - With `--local-overwrites`: Local version overwrites remote
 
