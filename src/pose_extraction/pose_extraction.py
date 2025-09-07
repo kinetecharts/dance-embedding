@@ -323,29 +323,29 @@ class PoseExtractor:
         image_height: int,
     ) -> npt.NDArray[np.float32] | None:
         """Extract 2D landmark positions from MediaPipe results."""
-        if results.pose_landmarks is None or len(results.pose_landmarks) == 0:
+        if results.pose_world_landmarks is None or len(results.pose_world_landmarks) == 0:
             return None
         
-        pose_landmarks = results.pose_landmarks[0]
-        normalized_landmarks = [pose_landmarks[lm] for lm in mp_pose.PoseLandmark]
+        pose_world_landmarks = results.pose_world_landmarks[0]
+        normalized_landmarks = [pose_world_landmarks[lm] for lm in mp_pose.PoseLandmark]
         return np.array([(image_width * lm.x, image_height * lm.y) for lm in normalized_landmarks])
     
     def _read_landmark_positions_3d(self, results: Any) -> npt.NDArray[np.float32] | None:
         """Extract 3D landmark positions from MediaPipe results."""
-        if results.pose_landmarks is None or len(results.pose_landmarks) == 0:
+        if results.pose_world_landmarks is None or len(results.pose_world_landmarks) == 0:
             return None
         
-        pose_landmarks = results.pose_landmarks[0]
-        landmarks = [pose_landmarks[lm] for lm in mp_pose.PoseLandmark]
+        pose_world_landmarks = results.pose_world_landmarks[0]
+        landmarks = [pose_world_landmarks[lm] for lm in mp_pose.PoseLandmark]
         return np.array([(lm.x, lm.y, lm.z) for lm in landmarks])
     
     def _extract_confidence_scores(self, results: Any) -> list[float] | None:
         """Extract confidence scores from MediaPipe results."""
-        if results.pose_landmarks is None or len(results.pose_landmarks) == 0:
+        if results.pose_world_landmarks is None or len(results.pose_world_landmarks) == 0:
             return None
         
-        pose_landmarks = results.pose_landmarks[0]
-        return [lm.visibility for lm in pose_landmarks]
+        pose_world_landmarks = results.pose_world_landmarks[0]
+        return [lm.visibility for lm in pose_world_landmarks]
     
     def _log_to_rerun(self, frame: VideoFrame, landmarks_2d: npt.NDArray[np.float32] | None, 
                      landmarks_3d: npt.NDArray[np.float32] | None) -> None:
