@@ -1,0 +1,14 @@
+# OSC to WebSocket Bridge Requirements
+# These dependencies are now included in pyproject.toml dev dependencies
+# Install with: uv sync --dev
+
+# Web framework and WebSocket support
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+websockets>=12.0
+
+# OSC support (already in main dependencies)
+python-osc>=1.8.0
+
+# Additional utilities
+python-multipart>=0.0.6

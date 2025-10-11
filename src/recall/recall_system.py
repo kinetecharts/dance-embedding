@@ -239,6 +239,8 @@ class RecallSystem:
                 if self.osc_streamer:
                     logger.debug("Calling OSC streamer with pose data")
                     self.osc_streamer.stream_pose(pose_data)
+                    # Also stream raw pose landmarks
+                    self.osc_streamer.stream_raw_pose_landmarks(pose_data)
                 else:
                     logger.debug("No OSC streamer available")
                 
@@ -367,6 +369,8 @@ class RecallSystem:
                 if self.osc_streamer:
                     logger.debug("Calling OSC streamer with pose data")
                     self.osc_streamer.stream_pose(pose_data)
+                    # Also stream raw pose landmarks
+                    self.osc_streamer.stream_raw_pose_landmarks(pose_data)
                 else:
                     logger.debug("No OSC streamer available")
                 
@@ -529,6 +533,7 @@ class RecallSystem:
         avg_fps = self.frame_count / elapsed if elapsed > 0.1 else 0  # Add small buffer to avoid division by zero
         
         # Get recording status
+        warmup_status = None
         if self.video_recorder and self.video_recorder.is_recording():
             warmup_status = self.video_recorder.get_warmup_status()
             

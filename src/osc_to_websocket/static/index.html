@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OSC to WebSocket Bridge - Dance Embedding</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .status-card {
+            text-align: center;
+        }
+
+        .status-indicator {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 10px;
+        }
+
+        .status-connected {
+            background: #4CAF50;
+            box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+        }
+
+        .status-disconnected {
+            background: #f44336;
+            box-shadow: 0 0 10px rgba(244, 67, 54, 0.5);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .log-container {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        }
+
+        .log-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .log-controls {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5a6fd8;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        #log {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.85rem;
+            line-height: 1.4;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .log-entry {
+            margin-bottom: 8px;
+            padding: 5px 0;
+            border-bottom: 1px solid #333;
+        }
+
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+
+        .log-timestamp {
+            color: #888;
+            font-size: 0.8rem;
+        }
+
+        .log-address {
+            color: #4CAF50;
+            font-weight: bold;
+        }
+
+        .log-args {
+            color: #ffd700;
+        }
+
+        .log-type {
+            color: #ff6b6b;
+            font-weight: bold;
+        }
+
+        .filters {
+            margin-bottom: 15px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .filter-input {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .filter-select {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            background: white;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎭 OSC to WebSocket Bridge</h1>
+            <p>Real-time pose data streaming for dance embedding system</p>
+        </div>
+
+        <div class="dashboard">
+            <div class="card status-card">
+                <h3>Connection Status</h3>
+                <div id="status" class="status-indicator status-disconnected"></div>
+                <span id="status-text">Disconnected</span>
+                
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-value" id="messages-received">0</div>
+                        <div class="stat-label">Messages Received</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="messages-sent">0</div>
+                        <div class="stat-label">Messages Sent</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="active-clients">0</div>
+                        <div class="stat-label">Active Clients</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="uptime">0s</div>
+                        <div class="stat-label">Uptime</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>Server Information</h3>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-value">OSC</div>
+                        <div class="stat-label">Port 6448</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">WebSocket</div>
+                        <div class="stat-label">Port 8000</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">Protocol</div>
+                        <div class="stat-label">UDP → WS</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">Format</div>
+                        <div class="stat-label">JSON</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="log-container">
+            <div class="log-header">
+                <h3>Live OSC Messages</h3>
+                <div class="log-controls">
+                    <input type="text" id="address-filter" class="filter-input" placeholder="Filter by OSC address...">
+                    <select id="type-filter" class="filter-select">
+                        <option value="">All Types</option>
+                        <option value="pose">Pose Data</option>
+                        <option value="body">Body Data</option>
+                        <option value="hand">Hand Data</option>
+                        <option value="face">Face Data</option>
+                        <option value="unknown">Unknown</option>
+                    </select>
+                    <button id="clear-log" class="btn btn-secondary">Clear</button>
+                    <button id="pause-log" class="btn btn-primary">Pause</button>
+                </div>
+            </div>
+            
+            <div class="filters">
+                <input type="number" id="max-lines" class="filter-input" placeholder="Max lines (default: 200)" value="200">
+                <label>
+                    <input type="checkbox" id="show-timestamps" checked> Show timestamps
+                </label>
+                <label>
+                    <input type="checkbox" id="auto-scroll" checked> Auto-scroll
+                </label>
+            </div>
+            
+            <div id="log"></div>
+        </div>
+    </div>
+
+    <script>
+        class OSCBridge {
+            constructor() {
+                this.ws = null;
+                this.isConnected = false;
+                this.isPaused = false;
+                this.maxLines = 200;
+                this.logEntries = [];
+                this.filters = {
+                    address: '',
+                    type: ''
+                };
+                
+                this.initializeElements();
+                this.setupEventListeners();
+                this.connect();
+                this.startStatsUpdate();
+            }
+
+            initializeElements() {
+                this.statusEl = document.getElementById('status');
+                this.statusTextEl = document.getElementById('status-text');
+                this.logEl = document.getElementById('log');
+                this.messagesReceivedEl = document.getElementById('messages-received');
+                this.messagesSentEl = document.getElementById('messages-sent');
+                this.activeClientsEl = document.getElementById('active-clients');
+                this.uptimeEl = document.getElementById('uptime');
+                
+                this.addressFilterEl = document.getElementById('address-filter');
+                this.typeFilterEl = document.getElementById('type-filter');
+                this.clearLogEl = document.getElementById('clear-log');
+                this.pauseLogEl = document.getElementById('pause-log');
+                this.maxLinesEl = document.getElementById('max-lines');
+                this.showTimestampsEl = document.getElementById('show-timestamps');
+                this.autoScrollEl = document.getElementById('auto-scroll');
+            }
+
+            setupEventListeners() {
+                this.clearLogEl.addEventListener('click', () => this.clearLog());
+                this.pauseLogEl.addEventListener('click', () => this.togglePause());
+                this.addressFilterEl.addEventListener('input', (e) => this.setFilter('address', e.target.value));
+                this.typeFilterEl.addEventListener('change', (e) => this.setFilter('type', e.target.value));
+                this.maxLinesEl.addEventListener('change', (e) => this.maxLines = parseInt(e.target.value) || 200);
+            }
+
+            connect() {
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const wsUrl = `${protocol}//${window.location.host}/ws`;
+                
+                this.ws = new WebSocket(wsUrl);
+                
+                this.ws.onopen = () => {
+                    this.isConnected = true;
+                    this.updateStatus('Connected', 'status-connected');
+                    this.logMessage('WebSocket connected to server', 'system');
+                };
+                
+                this.ws.onclose = () => {
+                    this.isConnected = false;
+                    this.updateStatus('Disconnected', 'status-disconnected');
+                    this.logMessage('WebSocket connection closed', 'system');
+                    
+                    // Attempt to reconnect after 3 seconds
+                    setTimeout(() => this.connect(), 3000);
+                };
+                
+                this.ws.onerror = (error) => {
+                    this.logMessage(`WebSocket error: ${error}`, 'error');
+                };
+                
+                this.ws.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        this.handleMessage(data);
+                    } catch (e) {
+                        this.logMessage(`Invalid JSON received: ${event.data}`, 'error');
+                    }
+                };
+            }
+
+            handleMessage(data) {
+                if (data.type === 'welcome') {
+                    this.logMessage(data.message, 'system');
+                    this.updateStats(data.server_stats);
+                } else if (data.type === 'osc_message') {
+                    this.logOSCMessage(data);
+                }
+            }
+
+            logOSCMessage(data) {
+                if (this.isPaused) return;
+                
+                // Apply filters
+                if (this.filters.address && !data.address.includes(this.filters.address)) return;
+                if (this.filters.type && data.data_type !== this.filters.type) return;
+                
+                const timestamp = this.showTimestampsEl.checked ? 
+                    `[${new Date().toLocaleTimeString()}] ` : '';
+                
+                const argsStr = data.args.length > 0 ? 
+                    ` ${JSON.stringify(data.args)}` : '';
+                
+                const typeStr = data.data_type ? ` [${data.data_type.toUpperCase()}]` : '';
+                
+                const logEntry = {
+                    timestamp: timestamp,
+                    address: data.address,
+                    args: argsStr,
+                    type: typeStr,
+                    full: `${timestamp}${data.address}${argsStr}${typeStr}`
+                };
+                
+                this.logEntries.unshift(logEntry);
+                
+                // Limit log entries
+                if (this.logEntries.length > this.maxLines) {
+                    this.logEntries = this.logEntries.slice(0, this.maxLines);
+                }
+                
+                this.renderLog();
+            }
+
+            renderLog() {
+                this.logEl.innerHTML = this.logEntries.map(entry => 
+                    `<div class="log-entry">
+                        <span class="log-timestamp">${entry.timestamp}</span>
+                        <span class="log-address">${entry.address}</span>
+                        <span class="log-args">${entry.args}</span>
+                        <span class="log-type">${entry.type}</span>
+                    </div>`
+                ).join('');
+                
+                if (this.autoScrollEl.checked) {
+                    this.logEl.scrollTop = 0;
+                }
+            }
+
+            logMessage(message, type = 'info') {
+                const timestamp = this.showTimestampsEl.checked ? 
+                    `[${new Date().toLocaleTimeString()}] ` : '';
+                
+                const logEntry = {
+                    timestamp: timestamp,
+                    address: '',
+                    args: '',
+                    type: ` [${type.toUpperCase()}]`,
+                    full: `${timestamp}${message} [${type.toUpperCase()}]`
+                };
+                
+                this.logEntries.unshift(logEntry);
+                this.renderLog();
+            }
+
+            updateStatus(text, className) {
+                this.statusTextEl.textContent = text;
+                this.statusEl.className = `status-indicator ${className}`;
+            }
+
+            updateStats(stats) {
+                this.messagesReceivedEl.textContent = stats.messages_received || 0;
+                this.messagesSentEl.textContent = stats.messages_sent || 0;
+                this.activeClientsEl.textContent = stats.active_clients || 0;
+                
+                if (stats.uptime_seconds) {
+                    const hours = Math.floor(stats.uptime_seconds / 3600);
+                    const minutes = Math.floor((stats.uptime_seconds % 3600) / 60);
+                    const seconds = Math.floor(stats.uptime_seconds % 60);
+                    this.uptimeEl.textContent = `${hours}h ${minutes}m ${seconds}s`;
+                }
+            }
+
+            startStatsUpdate() {
+                setInterval(async () => {
+                    if (this.isConnected) {
+                        try {
+                            const response = await fetch('/api/stats');
+                            const stats = await response.json();
+                            this.updateStats(stats);
+                        } catch (e) {
+                            // Ignore fetch errors
+                        }
+                    }
+                }, 2000);
+            }
+
+            setFilter(type, value) {
+                this.filters[type] = value;
+                this.renderLog();
+            }
+
+            clearLog() {
+                this.logEntries = [];
+                this.renderLog();
+            }
+
+            togglePause() {
+                this.isPaused = !this.isPaused;
+                this.pauseLogEl.textContent = this.isPaused ? 'Resume' : 'Pause';
+                this.pauseLogEl.className = this.isPaused ? 'btn btn-danger' : 'btn btn-primary';
+            }
+        }
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', () => {
+            new OSCBridge();
+        });
+    </script>
+</body>
+</html>

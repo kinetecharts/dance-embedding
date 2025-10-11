@@ -45,6 +45,13 @@
           "acceleration_fast_rise": 0.9,
           "acceleration_slow_decay": 0.98
         }
+      },
+      "raw_pose_landmarks": {
+        "enabled": true,
+        "host": "127.0.0.1",
+        "port": 6448,
+        "address": "/pose/raw_landmarks",
+        "include_confidence": true
       }
     }
   },

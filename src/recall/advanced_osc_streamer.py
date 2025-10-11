@@ -75,6 +75,7 @@ class AdvancedOSCStreamer:
         self.clients: Dict[str, Optional[udp_client.UDPClient]] = {}
         self.z_filters: Dict[str, ZFilter] = {}
         self.last_stream_time = 0
+        self.last_raw_landmarks_time = 0
         self.stream_interval = 1.0 / config.stream_rate if config.stream_rate > 0 else 0
         
         # Previous pose data for velocity/acceleration calculations
@@ -399,14 +400,66 @@ class AdvancedOSCStreamer:
                 acceleration_magnitude                                     # 21: acceleration
             ]
             
-            # Send to all enabled streams
+            # Send to all enabled streams (except raw_pose_landmarks which has its own method)
             for stream_name, stream_config in self.config.streams.items():
-                if stream_config.enabled:
+                if stream_config.enabled and "raw_pose_landmarks" not in stream_name:
                     logger.debug(f"Sending OSC message to {stream_name} at {stream_config.address}: {len(osc_data)} values")
                     self._send_osc_message(stream_name, stream_config.address, *osc_data)
             
             # Update previous positions for next frame
             self._update_previous_positions(left_ankle, right_ankle)
+    
+    def stream_raw_pose_landmarks(self, pose_data: PoseData):
+        """Stream raw pose landmarks as array of 33 subarrays with x,y,z,confidence"""
+        logger.info("🔍 stream_raw_pose_landmarks called")
+        
+        if not self.config.enabled:
+            logger.info("❌ OSC streaming disabled")
+            return
+        
+        current_time = time.time()
+        if current_time - self.last_raw_landmarks_time < self.stream_interval:
+            logger.info(f"⏱️ Raw landmarks stream interval not met: {current_time - self.last_raw_landmarks_time:.3f}s")
+            return
+        
+        self.last_raw_landmarks_time = current_time
+        
+        if pose_data is None or pose_data.landmarks is None:
+            logger.info("❌ No pose data available for raw landmarks streaming")
+            return
+        
+        logger.info(f"✅ Streaming raw pose landmarks to OSC streams")
+        
+        # Create array of 33 subarrays, each with [x, y, z, confidence]
+        # Since OSC doesn't support nested arrays, we'll send a flat array with 132 values
+        # that can be reconstructed as 33 subarrays of 4 values each
+        raw_landmarks = []
+        
+        for i in range(33):  # MediaPipe pose has 33 landmarks
+            if i < len(pose_data.landmarks):
+                landmark = pose_data.landmarks[i]
+                confidence = pose_data.confidence[i] if i < len(pose_data.confidence) else 1.0
+                
+                if pose_data.is_3d and len(landmark) >= 3:
+                    # 3D coordinates: [x, y, z, confidence]
+                    raw_landmarks.extend([landmark[0], landmark[1], landmark[2], confidence])
+                else:
+                    # 2D coordinates: [x, y, 0, confidence]
+                    raw_landmarks.extend([landmark[0], landmark[1], 0.0, confidence])
+            else:
+                # Missing landmark: [0, 0, 0, 0]
+                raw_landmarks.extend([0.0, 0.0, 0.0, 0.0])
+        
+        # Send to raw pose landmarks stream
+        logger.debug(f"Available streams: {list(self.config.streams.keys())}")
+        for stream_name, stream_config in self.config.streams.items():
+            logger.debug(f"Checking stream: {stream_name}, enabled: {stream_config.enabled}")
+            if stream_config.enabled and "raw_pose_landmarks" in stream_name:
+                logger.info(f"✅ Sending raw landmarks to {stream_name}: {len(raw_landmarks)} values (33 landmarks × 4 values)")
+                logger.info(f"Data format: Flat array of 132 values that can be reconstructed as 33 subarrays of [x,y,z,confidence]")
+                self._send_osc_message(stream_name, stream_config.address, *raw_landmarks)
+            else:
+                logger.debug(f"Skipping stream {stream_name}: enabled={stream_config.enabled}, contains 'raw_pose_landmarks'={'raw_pose_landmarks' in stream_name}")
     
     def _get_previous_position(self, limb: str, frames_back: int = 1) -> np.ndarray:
         """Get previous position for a limb (for velocity/acceleration calculations)"""

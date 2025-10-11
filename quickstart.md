@@ -41,6 +41,8 @@ View pose analysis and visualizations:
 # Start the web application server
 cd src/viewer/webapp
 python server.py
+// or
+uv run server.py
 ```
 
 **What it does:**
@@ -62,6 +64,17 @@ python rebuild_database.py
 
 # Start live camera mode
 python -m recall.main --mode camera --top-n 1 --match-interval 2.0 --playback-duration 3.0
+```
+
+## Step 4: osc streaming
+```
+uv run examples/osc_streaming_example.py --record-video --skip-matching
+uv run examples/osc_streaming_example.py --record-video --raw-pose --skip-matching
+```
+
+## Step 5: Forward osc to websocket, port 8000 ws://localhost:8000/ws
+```
+uv run src/osc_to_websocket/simple_server.py
 ```
 
 **What it does:**
