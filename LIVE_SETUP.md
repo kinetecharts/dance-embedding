@@ -1,4 +1,4 @@
-# Live setup: camera → Wekinator → Max
+# Live setup: camera → (Wekinator or FluCoMa) → Max
 
 You move in front of the laptop camera and the sound changes. Three programs pass numbers along a chain:
 
@@ -16,6 +16,13 @@ You move in front of the laptop camera and the sound changes. Three programs pas
 ```
 
 **Every time:** start the app, then Wekinator, then Max. First time on a new Mac? Do [One-time install](#one-time-install) first.
+
+**There are two ways to turn poses into sound:**
+
+| Way | Chain | Where the learning happens | Section |
+|---|---|---|---|
+| A. With Wekinator | app → Wekinator (port 6448) → Max (port 12000) | In Wekinator | [Every time](#every-time-start-the-three-programs) |
+| B. FluCoMa in Max, without Wekinator | app → Max (port 12001) | Inside Max, with FluCoMa | [Without Wekinator](#without-wekinator-flucoma-in-max) |
 
 ---
 
@@ -38,6 +45,7 @@ You move in front of the laptop camera and the sound changes. Three programs pas
 | `uv` (runs the Python app and installs its parts) | `curl -LsSf https://astral.sh/uv/install.sh \| sh` | `uv --version` |
 | Wekinator 2.1 | [github.com/fiebrink1/wekinator](https://github.com/fiebrink1/wekinator). Under [Releases](https://github.com/fiebrink1/wekinator/releases/tag/v2.1.0.4), download `Wekinator_Mac_v2.1.0.4.zip` (the version the studio Mac uses), unzip it, and drag Wekinator into `/Applications`. Java is built in. | It opens |
 | Max 8 or newer (the patches were made in Max 8.6.2) | [cycling74.com](https://cycling74.com/downloads) | It opens |
+| FluCoMa for Max (machine-learning add-on, only for [way B](#without-wekinator-flucoma-in-max)) | [flucoma.org](https://www.flucoma.org/). Steps in [Install FluCoMa](#install-flucoma). | In Max, a new object `fluid.mlpregressor~` has a solid border, not a dashed one |
 
 Then install the app's Python parts once:
 
@@ -126,6 +134,65 @@ Open these two patches from the `max/` folder (double-click them in Finder):
 Turn on audio in Max (the speaker button, or **Options → Audio Status → Audio On**). Then move, and you should hear the sound change.
 
 Keep all the `.maxpat` files together in `max/`. The two patches above load the others (`paffy~`, `paffycontrol`, `fader` and so on) by name.
+
+---
+
+## Without Wekinator: FluCoMa in Max
+
+This is the setup in use since Nov 2026. Max takes the 21 pose numbers straight from the app and learns the pose-to-sound mapping itself, with FluCoMa (a free machine-learning add-on for Max). Wekinator isn't used.
+
+```
+pose app ──/pose/data, 21 numbers──► port 12001 ──► regression-in-flucoma-pose ──► _wek-receive-05-2026 ──► synth
+                                                     (FluCoMa learns poses)          (drives the paffy~ voices)
+```
+
+### Install FluCoMa
+
+Once per Mac, per Max version.
+
+1. Download the Max package from [flucoma.org](https://www.flucoma.org/). The same file is under [github.com/flucoma/flucoma-max/releases](https://github.com/flucoma/flucoma-max/releases). On the studio Mac we used `FluCoMa-Max-1.0.10.zip` (91 MB).
+2. Unzip it. You get a folder called `FluidCorpusManipulation`.
+3. Move that whole folder into Max's packages folder:
+
+   | Max version | Packages folder |
+   |---|---|
+   | Max 9 | `~/Documents/Max 9/Packages/` |
+   | Max 8 | `~/Documents/Max 8/Packages/` |
+
+   ```bash
+   mv ~/Downloads/FluidCorpusManipulation ~/Documents/Max\ 9/Packages/
+   ```
+4. **Restart Max.** Max only reads packages when it starts.
+5. Check it: in a new patch, create the object `fluid.mlpregressor~`. A solid border means it loaded. A dashed border means Max can't find it, which usually means the folder is in the wrong place or Max wasn't restarted.
+
+`fluid.mlpregressor~` is not a separate file in `externals/`. It is inside `fluid.libmanipulation.mxo`, and Max finds it through the package's `init/` folder. So don't move single files out of the package.
+
+The studio Mac has both Max 8.6.5 (`Max.app`) and Max 9.1.5 (`Max 2.app`). FluCoMa is installed for Max 9 only.
+
+### Run it
+
+1. Start the app, sending the 12001 stream to this Mac:
+   ```bash
+   uv run examples/osc_streaming_example.py --camera-id 0 --skip-matching --raw-pose --remote-host 127.0.0.1 --remote-port 12001
+   ```
+   The log should show `pose_data_remote at 127.0.0.1:12001`. Without `--remote-host`, the stream goes to the address saved in `src/recall/config.json`.
+2. In Max 9, open **`max/regression-in-flucoma-pose.maxpat`** and **`max/_wek-receive-05-2026.maxpat`**.
+3. Turn on audio in Max.
+4. Train, following the numbered comments in `regression-in-flucoma-pose`:
+   1. **Strike a pose.** The first 21 numbers of each message fill `pose-xybuf`. The number of inputs is set to 21 when the patch opens. If you change it, the examples and the model are cleared.
+   2. **Adjust the synth** to the sound you want for that pose.
+   3. **Click to add** the pose and the synth settings as an example.
+   4. Repeat steps 1–3 for each pose.
+   5. **Click train.** This scales the inputs, then teaches the network. Click again until the error is close to zero.
+   6. **Switch to predicting**, then move. The sound morphs between the presets you set for your poses.
+
+What each patch does:
+- **`regression-in-flucoma-pose.maxpat`** listens on port 12001. Its `udpreceive` is created on 12000, and when the patch opens, `loadmess set 12001` → `port $1` switches it to 12001. The first 21 numbers of each message fill `pose-xybuf`. `fluid.normalize~` scales them, and `fluid.mlpregressor~` (3 hidden layers) predicts the synth settings. It sends the predictions on `[s regression-list1]`. To test without the camera, drag its sliders or click for a random pose; these go to `[r pose-in]`.
+- **`_wek-receive-05-2026.maxpat`** takes the predictions (`[r regression-list]`, `[r regression-list1]`) and drives the synth voices (`s 1-gain`, `s 2-topaffyline` and so on).
+
+**Check the OSC address.** The app sends `/pose/data` on 12001, but the saved patch routes on `OSC-route /wek`, which drops `/pose/data`. If the patch doesn't react when you move, change that object to `OSC-route /pose/data`.
+
+To see what reaches the port, quit Max and run `uv run scripts/osc_check.py 12001`. You should see `/pose/data: 17 msgs/s, 21 values`.
 
 ---
 
