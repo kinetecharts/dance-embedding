@@ -23,6 +23,12 @@ Usage:
     
     # Custom matching intervals
     uv run examples/osc_streaming_example.py --match-interval 2.0 --match-duration 1.0
+
+    # Enable video recording with audio and skip matching
+    uv run examples/osc_streaming_example.py --record-video --skip-matching
+
+    # Enable raw pose landmarks streaming and skip matching
+    uv run examples/osc_streaming_example.py --raw-pose --skip-matching
 """
 
 import argparse
@@ -135,6 +141,9 @@ Examples:
     
     # Record with custom settings
     uv run examples/osc_streaming_example.py --record-video --record-fps 30 --record-quality high
+    
+    # Enable raw pose landmarks streaming
+    uv run examples/osc_streaming_example.py --raw-pose --skip-matching
         """
     )
     
@@ -199,6 +208,12 @@ Examples:
         help="Directory to save recordings (default: recordings)"
     )
     
+    parser.add_argument(
+        "--raw-pose",
+        action="store_true",
+        help="Enable raw pose landmarks streaming (33 landmarks × 4 values: x,y,z,confidence)"
+    )
+    
     args = parser.parse_args()
     
     # Set up logging
@@ -246,6 +261,13 @@ Examples:
         config.record_dir = args.record_dir
         logger.info(f"🎥 Video recording enabled: {args.record_fps} FPS, {args.record_quality} quality")
         logger.info(f"💾 Recordings will be saved to: {args.record_dir}")
+    
+    # Enable raw pose landmarks streaming if requested
+    if args.raw_pose:
+        logger.info("📡 Raw pose landmarks streaming enabled")
+        logger.info("   - 33 landmarks × 4 values (x, y, z, confidence)")
+        logger.info("   - OSC address: /pose/raw_landmarks")
+        logger.info("   - Port: 6449")
     
     # Create and run recall system
     try:

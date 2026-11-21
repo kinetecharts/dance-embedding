@@ -233,7 +233,7 @@ def create_osc_dispatcher():
     return dispatcher
 
 
-async def start_osc_server(host: str = "0.0.0.0", port: int = 6448):
+async def start_osc_server(host: str = "0.0.0.0", port: int = 6449):
     """Start the OSC server"""
     try:
         print(f"🚀 Starting OSC server on {host}:{port}")
@@ -255,12 +255,12 @@ async def startup_event():
     print("=" * 50)
     
     # Start OSC server
-    await start_osc_server("0.0.0.0", 6448)
+    await start_osc_server("0.0.0.0", 6449)
     
     print("✅ Simple OSC Bridge started successfully")
     print("🌐 Web interface: http://localhost:8000")
     print("🔌 WebSocket endpoint: ws://localhost:8000/ws")
-    print("📡 OSC endpoint: udp://0.0.0.0:6448")
+    print("📡 OSC endpoint: udp://0.0.0.0:6449")
     print("=" * 50)
 
 

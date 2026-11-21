@@ -653,3 +653,5 @@ logs/
 tmp/
 >>>>>>> Stashed changes
 temp/ 
+# Video/audio recordings (large)
+recordings/
