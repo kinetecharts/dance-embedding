@@ -46,6 +46,12 @@
           "acceleration_slow_decay": 0.98
         }
       },
+      "pose_data_remote": {
+        "enabled": true,
+        "host": "10.152.168.59",
+        "port": 12001,
+        "address": "/pose/data"
+      },
       "raw_pose_landmarks": {
         "enabled": true,
         "host": "127.0.0.1",

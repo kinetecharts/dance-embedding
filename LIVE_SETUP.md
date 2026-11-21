@@ -162,12 +162,13 @@ To start over without the old examples, use **Delete all examples** in Wekinator
 
 ## Technical Detail
 
-**All the OSC the app sends** (set in `src/recall/config.json`, under `osc_streaming.streams`):
+**All the OSC the app sends** (set in `src/recall/config.json`, under `osc_streaming.streams`). Every stream except the raw landmarks gets the same 21 numbers. To send them to another machine, copy the `pose_data_remote` entry and change `host` and `port`. Then restart the app.
 
 | Stream | Port | Address | Values | Read by |
 |---|---|---|---|---|
 | `pose_data` | 6448 | `/pose/data` | 21 floats | Wekinator |
 | `pose_data_duplicate` | 1234 | `/pose/data` | 21 floats | GraphXR forward |
+| `pose_data_remote` | 10.152.168.59:12001 | `/pose/data` | 21 floats | Remote OSC server on the studio network |
 | `raw_pose_landmarks` | 6449 | `/pose/raw_landmarks` | 132 floats (33 points × x, y, z, confidence) | `src/osc_to_websocket/simple_server.py` |
 
 **The 21 inputs, in order** (from `wekinator/21_plus_4/inputConfig.xml`):
