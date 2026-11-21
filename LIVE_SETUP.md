@@ -73,7 +73,16 @@ A window opens with your camera picture and a skeleton drawn on you. The termina
 ✅ Camera 0 initialized successfully
 ```
 
-- To quit, click the camera window and press `q`. Press `v` to start and stop recording a video.
+- To quit, click the camera window and press `q`.
+- **Recording:** click the camera window and press `v` to start, then `v` again to stop. Add `--record-video` to start recording as soon as the app opens. `v` still stops and restarts it. The camera picture never shows a REC mark, so it's safe to show to an audience. You can tell whether it's recording from:
+
+  | Signal | Recording | Not recording |
+  |---|---|---|
+  | Window title | `🔴 REC pose_recording_20261121_143458 - Live Camera` | `⚪ not recording (v = record) - Live Camera` |
+  | macOS notification | "Recording ON: pose_recording_…" | "Recording OFF. Saved in recordings/" |
+  | Terminal | `🎬 Recording: 🔴 RECORDING` | `🎬 Recording: ⚪ STOPPED` |
+
+  While the file saves after you stop, the title reads `💾 SAVING…` and the picture pauses for about a second. The file is `recordings/pose_recording_<date>_<time>_with_audio.mp4` (camera picture with the skeleton, plus microphone sound).
 - Picture black or showing the wrong camera? Run `uv run examples/osc_streaming_example.py --list-cameras` and try the other number. On the studio MacBook, `0` is the built-in camera and `1` is the Canon EOS webcam.
 
 **Remote OSC server.** The app also sends the same 21 numbers Wekinator gets to a second computer, `10.152.168.59` port `12001`. Change it for one run with these options:
