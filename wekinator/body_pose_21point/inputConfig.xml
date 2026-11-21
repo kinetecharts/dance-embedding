@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<OSCInputGroup>
+  <oscMessage>/pose/data</oscMessage>
+  <numInputs>21</numInputs>
+  <groupName>Inputs</groupName>
+  <inputNames>
+    <string>lh-x</string>
+    <string>lh-y</string>
+    <string>lh-z</string>
+    <string>rh-x</string>
+    <string>rh-y</string>
+    <string>rh-z</string>
+    <string>lf-x</string>
+    <string>lf-y</string>
+    <string>lf-z</string>
+    <string>rf-x</string>
+    <string>rf-y</string>
+    <string>rf-z</string>
+    <string>body-yaw</string>
+    <string>body-pitch</string>
+    <string>head-yaw</string>
+    <string>head-pitch</string>
+    <string>pos-x</string>
+    <string>pos-y</string>
+    <string>pos-z</string>
+    <string>vel</string>
+    <string>acc</string>
+  </inputNames>
+</OSCInputGroup>

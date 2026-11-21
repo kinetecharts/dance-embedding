@@ -107,6 +107,15 @@ To change the default for every run, edit `host` and `port` under `pose_data_rem
 
 **In plain words:** Wekinator listens on mailbox 6448, guesses the sound settings for your current pose, and posts them to mailbox 12000.
 
+**Other Wekinator projects in this repo.** Both take the same 21 numbers from the app, so you can open either one in step 2:
+
+| Project | Outputs | Sends to | Training examples | Use it for |
+|---|---|---|---|---|
+| `wekinator/21_plus_4/` (default) | 21 sliders + 4 classes = 25 values | `localhost:12000`, `/wek` | 662 | The setup on this page, with `max/wek-receive-05.maxpat` |
+| `wekinator/body_pose_21point/` | 21 sliders (0.0–1.0), no classes | **`10.1.50.146:12000`**, `/wek/` | 499 | An earlier example (Aug 2025): 21 continuous controls and no class choices |
+
+`body_pose_21point` sends to `10.1.50.146`, a different computer from the Aug 2025 setup, and not to this Mac. To use it with Max here, change Wekinator's output host to `localhost` before you click Run. Its message address is `/wek/`, with a slash at the end. The Max patches route on `/wek`, so check that the numbers arrive. `uv run scripts/osc_check.py 12000` (with Max closed) shows the exact address.
+
 ### Step 3. Start Max
 
 Open these two patches from the `max/` folder (double-click them in Finder):
@@ -203,7 +212,7 @@ To start over without the old examples, use **Delete all examples** in Wekinator
 `lh-x lh-y lh-z rh-x rh-y rh-z lf-x lf-y lf-z rf-x rf-y rf-z body-yaw body-pitch head-yaw head-pitch pos-x pos-y pos-z vel acc`.
 Here lh, rh, lf and rf mean left hand, right hand, left foot and right foot. Hands and feet are measured relative to the body, so stepping closer to the camera doesn't change them. How each value is computed is in `src/recall/OSC_STREAMING.md`.
 
-**The Wekinator project** (`wekinator/21_plus_4/`):
+**The default Wekinator project** (`wekinator/21_plus_4/`):
 
 | File | What it holds |
 |---|---|
@@ -215,4 +224,6 @@ Here lh, rh, lf and rf mean left hand, right hand, left foot and right foot. Han
 
 **The Max side:** `max/wek-receive-05.maxpat` runs `udpreceive 12000` → `OSC-route /wek` → `unpack` (21 floats + 4 ints) → `s` sends such as `1-gain` and `2-topaffyline`, which `_paf-8out-Wek-03.maxpat` picks up.
 
-**Where these came from:** copied from `~/KinetechArts/Projects/2025_Montalvo/21_plus_4/WekinatorProject` and `2025_Montalvo/max_02` (the newest patch set, Sep 2025). The originals still exist there. Wekinator saves into whichever copy you opened, so use the one in this repo.
+**`wekinator/body_pose_21point/`** has the same layout and the same 21 input names. `outputConfig.xml` sends `/wek/` to `10.1.50.146:12000`, with `outputs-1`…`outputs-21` (number, 0.0–1.0). It holds 499 examples in `current/currentData.arff`, and `current/models/model0.xml` … `model20.xml`.
+
+**Where these came from:** copied from `~/KinetechArts/Projects/2025_Montalvo/21_plus_4/WekinatorProject`, `2025_Montalvo/body_pose_21point/WekinatorProject`, and `2025_Montalvo/max_02` (the newest patch set, Sep 2025). The originals still exist there. Wekinator saves into whichever copy you opened, so use the one in this repo.
