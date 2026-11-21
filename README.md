@@ -13,6 +13,10 @@ A comprehensive system for converting dance videos into pose time series data us
 - **🎭 Dance Recall System**: Real-time pose matching and video recall using live camera or video input
 - **📡 OSC Streaming**: Real-time pose data streaming via Open Sound Control protocol
 
+## 🎛️ Live Performance Setup
+
+To run camera → Wekinator → Max (sound), follow [LIVE_SETUP.md](LIVE_SETUP.md). The Wekinator project is in `wekinator/21_plus_4/` and the Max patches are in `max/`.
+
 ## 🚀 Quick Start - Dance Recall System
 
 **Want to test the system quickly? Start here!**
