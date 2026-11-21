@@ -23,6 +23,10 @@ To run camera → Wekinator → Max (sound), follow [LIVE_SETUP.md](LIVE_SETUP.m
 
 ### 1. Install Dependencies
 ```bash
+# macOS: PortAudio is needed to build pyaudio (audio recording)
+xcode-select --install   # Apple build tools, if not already installed
+brew install portaudio
+
 # Clone and setup
 git clone git@github.com:kinetecharts/dance-embedding.git
 cd dance_embedding

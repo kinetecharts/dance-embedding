@@ -33,6 +33,8 @@ You move in front of the laptop camera and the sound changes. Three programs pas
 | You need | Where to get it | Check that it works |
 |---|---|---|
 | This repo | `git clone https://github.com/kinetecharts/dance-embedding.git` | `ls LIVE_SETUP.md` |
+| Homebrew (installs Mac command-line tools) | [brew.sh](https://brew.sh) | `brew --version` |
+| PortAudio (sound library; the app's audio recording part is built on it) | `xcode-select --install`, then `brew install portaudio` | `brew list portaudio` |
 | `uv` (runs the Python app and installs its parts) | `curl -LsSf https://astral.sh/uv/install.sh \| sh` | `uv --version` |
 | Wekinator 2.1 | [wekinator.org/downloads](http://www.wekinator.org/downloads/). Drag it into `/Applications`. Java is built in. | It opens |
 | Max 8 or newer (the patches were made in Max 8.6.2) | [cycling74.com](https://cycling74.com/downloads) | It opens |
@@ -41,8 +43,12 @@ Then install the app's Python parts once:
 
 ```bash
 cd dance-embedding        # the repo folder
-uv sync                   # takes a few minutes the first time
+uv sync                   # about 1.3 GB of packages, under a minute on fast internet
 ```
+
+If `uv sync` stops with `portaudio.h: No such file or directory` or `Failed to build pyaudio`, PortAudio is missing. Run `brew install portaudio` and then run `uv sync` again. (`pyaudio` has no ready-made Mac download, so `uv sync` builds it, and the build needs PortAudio.)
+
+What you download: the repo is about 70 MB. `uv sync` adds a 1.3 GB `.venv` folder. The live setup does not need the dance videos in `data/` or the `recordings/` folder, and neither one is in git.
 
 **Camera permission:** the first time the app starts, macOS asks whether **Terminal** (or iTerm, or VS Code, whichever you run it from) may use the camera. Click **Allow**. If you clicked Don't Allow, turn it on in **System Settings → Privacy & Security → Camera**, then restart Terminal.
 
