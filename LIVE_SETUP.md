@@ -70,6 +70,18 @@ A window opens with your camera picture and a skeleton drawn on you. The termina
 - To quit, click the camera window and press `q`. Press `v` to start and stop recording a video.
 - Picture black or showing the wrong camera? Run `uv run examples/osc_streaming_example.py --list-cameras` and try the other number. On the studio MacBook, `0` is the built-in camera and `1` is the Canon EOS webcam.
 
+**Remote OSC server.** The app also sends the same 21 numbers Wekinator gets to a second computer, `10.152.168.59` port `12001`. Change it for one run with these options:
+
+| You add | It sends to |
+|---|---|
+| (nothing) | The address saved in `src/recall/config.json`, under `pose_data_remote` |
+| `--remote-host 10.152.168.70 --remote-port 9000` | `10.152.168.70:9000` |
+| `--remote-port 9000` | The saved host, port `9000` |
+| `--no-remote` | No remote server |
+
+To change the default for every run, edit `host` and `port` under `pose_data_remote` in `src/recall/config.json`. The startup log shows where it is sending:
+`✅ OSC client initialized for pose_data_remote at 10.152.168.59:12001`
+
 ### Step 2. Start Wekinator
 
 1. Open **Wekinator**.
@@ -156,19 +168,20 @@ To start over without the old examples, use **Delete all examples** in Wekinator
 | Max gets nothing | Wekinator isn't in **Run** mode, or two copies of the patch are open | Click **Run**. Close duplicate patches. `lsof -nP -iUDP:12000` should show one `Max`. |
 | No sound, but numbers move in Max | Audio is off | Turn on audio in Max and check the output device in **Options → Audio Status**. |
 | Black camera window, or `Failed to open camera` | No camera permission, or the wrong camera number | See [Camera permission](#one-time-install). Try `--camera-id 1`. |
+| The remote server gets nothing | Wrong address, a firewall on the remote machine, or a different Wi-Fi network | Check the `pose_data_remote at …` line in the startup log. Run `ping 10.152.168.59`. On the remote machine, run `uv run scripts/osc_check.py 12001` (or any OSC monitor). |
 | `Config file not found: src/recall/config.json` | The app was started outside the repo folder | `cd` into the repo folder first. |
 
 ---
 
 ## Technical Detail
 
-**All the OSC the app sends** (set in `src/recall/config.json`, under `osc_streaming.streams`). Every stream except the raw landmarks gets the same 21 numbers. To send them to another machine, copy the `pose_data_remote` entry and change `host` and `port`. Then restart the app.
+**All the OSC the app sends** (set in `src/recall/config.json`, under `osc_streaming.streams`). Every stream except the raw landmarks gets the same 21 numbers. `--remote-host`, `--remote-port` and `--no-remote` change `pose_data_remote` for one run, without editing the file (the code is `apply_stream_overrides` in `src/recall/advanced_osc_streamer.py`). To add a third destination, copy the `pose_data_remote` entry under a new name.
 
 | Stream | Port | Address | Values | Read by |
 |---|---|---|---|---|
 | `pose_data` | 6448 | `/pose/data` | 21 floats | Wekinator |
 | `pose_data_duplicate` | 1234 | `/pose/data` | 21 floats | GraphXR forward |
-| `pose_data_remote` | 10.152.168.59:12001 | `/pose/data` | 21 floats | Remote OSC server on the studio network |
+| `pose_data_remote` | 10.152.168.59:12001 (set by `--remote-host` / `--remote-port`) | `/pose/data` | 21 floats | Remote OSC server on the studio network |
 | `raw_pose_landmarks` | 6449 | `/pose/raw_landmarks` | 132 floats (33 points × x, y, z, confidence) | `src/osc_to_websocket/simple_server.py` |
 
 **The 21 inputs, in order** (from `wekinator/21_plus_4/inputConfig.xml`):

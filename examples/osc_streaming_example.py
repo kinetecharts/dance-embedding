@@ -29,6 +29,10 @@ Usage:
 
     # Enable raw pose landmarks streaming and skip matching
     uv run examples/osc_streaming_example.py --raw-pose --skip-matching
+
+    # Send the Wekinator stream to a different remote OSC server (or none)
+    uv run examples/osc_streaming_example.py --skip-matching --remote-host 10.152.168.59 --remote-port 12001
+    uv run examples/osc_streaming_example.py --skip-matching --no-remote
 """
 
 import argparse
@@ -214,6 +218,23 @@ Examples:
         help="Enable raw pose landmarks streaming (33 landmarks × 4 values: x,y,z,confidence)"
     )
     
+    # Remote OSC server (gets the same 21 values as Wekinator)
+    parser.add_argument(
+        "--remote-host",
+        type=str,
+        help="Remote OSC server address, e.g. 10.152.168.59 (default: pose_data_remote.host in config.json)"
+    )
+    parser.add_argument(
+        "--remote-port",
+        type=int,
+        help="Remote OSC server port, e.g. 12001 (default: pose_data_remote.port in config.json)"
+    )
+    parser.add_argument(
+        "--no-remote",
+        action="store_true",
+        help="Don't send to the remote OSC server this run"
+    )
+
     args = parser.parse_args()
     
     # Set up logging
@@ -248,6 +269,20 @@ Examples:
         logger.error(f"Failed to load configuration: {e}")
         return
     
+    # Remote OSC server: command-line options override config.json for this run
+    remote = {}
+    if args.remote_host:
+        remote["host"] = args.remote_host
+    if args.remote_port:
+        remote["port"] = args.remote_port
+    if args.no_remote:
+        remote["enabled"] = False
+    elif remote:
+        remote.setdefault("enabled", True)
+        remote.setdefault("address", "/pose/data")
+    if remote:
+        config.osc_stream_overrides["pose_data_remote"] = remote
+
     # Update camera ID in config if specified
     if args.camera_id != 0:
         config.camera_id = args.camera_id

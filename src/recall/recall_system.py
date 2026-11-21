@@ -12,7 +12,7 @@ from .data_structures import PoseData, Match
 from .pose_tracker import PoseTracker
 from .pose_matcher import PoseMatcher
 from .video_player import create_video_player
-from .advanced_osc_streamer import create_advanced_osc_streamer
+from .advanced_osc_streamer import apply_stream_overrides, create_advanced_osc_streamer
 from .json_config_loader import create_config_loader
 from .video_recorder import MacVideoRecorder
 
@@ -44,6 +44,7 @@ class RecallSystem:
             if config.osc_enabled:
                 # Get OSC configuration from JSON config loader
                 osc_config = self.config_loader.config_data.get("osc_streaming", {})
+                osc_config = apply_stream_overrides(osc_config, config.osc_stream_overrides)
                 self.osc_streamer = create_advanced_osc_streamer(osc_config)
                 if self.osc_streamer:
                     logger.info("✅ Advanced OSC streaming enabled with multiple streams")
@@ -90,6 +91,7 @@ class RecallSystem:
             if config.osc_enabled:
                 # Get OSC configuration from JSON config loader
                 osc_config = self.config_loader.config_data.get("osc_streaming", {})
+                osc_config = apply_stream_overrides(osc_config, config.osc_stream_overrides)
                 self.osc_streamer = create_advanced_osc_streamer(osc_config)
                 if self.osc_streamer:
                     logger.info("✅ Advanced OSC streaming enabled with multiple streams")

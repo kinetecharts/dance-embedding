@@ -27,6 +27,9 @@ class RecallConfig:
     
     # OSC streaming configuration (now handled by JSON config)
     osc_enabled: bool = False
+    # Per-run changes to OSC streams in config.json, by stream name.
+    # Example: {"pose_data_remote": {"host": "10.0.0.5", "port": 9000}}
+    osc_stream_overrides: Dict[str, dict] = field(default_factory=dict)
     
     # Video recording configuration
     record_video: bool = False

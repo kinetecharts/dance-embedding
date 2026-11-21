@@ -501,6 +501,22 @@ class AdvancedOSCStreamer:
         self.clients.clear()
 
 
+def apply_stream_overrides(config_data: Dict[str, Any], overrides: Dict[str, dict]) -> Dict[str, Any]:
+    """Return a copy of the osc_streaming config with per-stream settings replaced.
+
+    A stream named in overrides but missing from the config is added.
+    Example: apply_stream_overrides(cfg, {"pose_data_remote": {"port": 9000}})
+    """
+    if not overrides:
+        return config_data
+    result = dict(config_data)
+    streams = {name: dict(s) for name, s in result.get("streams", {}).items()}
+    for name, changes in overrides.items():
+        streams.setdefault(name, {}).update(changes)
+    result["streams"] = streams
+    return result
+
+
 def create_advanced_osc_streamer(config_data: Dict[str, Any]) -> Optional[AdvancedOSCStreamer]:
     """Create an AdvancedOSCStreamer from configuration data"""
     if not config_data.get("enabled", False):
