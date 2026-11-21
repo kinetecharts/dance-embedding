@@ -46,7 +46,7 @@ cd dance-embedding        # the repo folder
 uv sync                   # about 1.3 GB of packages, under a minute on fast internet
 ```
 
-If `uv sync` stops with `portaudio.h: No such file or directory` or `Failed to build pyaudio`, PortAudio is missing. Run `brew install portaudio` and then run `uv sync` again. (`pyaudio` has no ready-made Mac download, so `uv sync` builds it, and the build needs PortAudio.)
+If `uv sync` stops with `'portaudio.h' file not found` or `Failed to build pyaudio`, PortAudio is missing. Run `brew install portaudio` and then run `uv sync` again. (`pyaudio` has no ready-made Mac download, so `uv sync` builds it, and the build needs PortAudio.)
 
 What you download: the repo is about 70 MB. `uv sync` adds a 1.3 GB `.venv` folder. The live setup does not need the dance videos in `data/` or the `recordings/` folder, and neither one is in git.
 
