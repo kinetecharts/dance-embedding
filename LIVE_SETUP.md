@@ -36,7 +36,7 @@ You move in front of the laptop camera and the sound changes. Three programs pas
 | Homebrew (installs Mac command-line tools) | [brew.sh](https://brew.sh) | `brew --version` |
 | PortAudio (sound library; the app's audio recording part is built on it) | `xcode-select --install`, then `brew install portaudio` | `brew list portaudio` |
 | `uv` (runs the Python app and installs its parts) | `curl -LsSf https://astral.sh/uv/install.sh \| sh` | `uv --version` |
-| Wekinator 2.1 | [wekinator.org/downloads](http://www.wekinator.org/downloads/). Drag it into `/Applications`. Java is built in. | It opens |
+| Wekinator 2.1 | [docubase.mit.edu/tools/wekinator](https://docubase.mit.edu/tools/wekinator/). Drag it into `/Applications`. Java is built in. | It opens |
 | Max 8 or newer (the patches were made in Max 8.6.2) | [cycling74.com](https://cycling74.com/downloads) | It opens |
 
 Then install the app's Python parts once:
